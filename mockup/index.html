@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Bias Laboratory — Internal Platform</title>
+<style>
+:root {
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --accent:#7c5cbf; --accent2:#9b72d8; --glow:rgba(124,92,191,.2);
+  --red:#f85149; --orange:#e3a14f; --yellow:#d4a72c;
+  --green:#3fb950; --blue:#58a6ff; --teal:#39c5cf;
+  --text:#e6edf3; --text2:#8b949e; --text3:#6e7681;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
+/* SIDEBAR */
+.sidebar{width:230px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.s-logo{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.s-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--teal));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.s-name{font-size:13px;font-weight:700;line-height:1.3}
+.s-sub{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.s-section{padding:14px 14px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.s-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 6px;border-radius:6px;cursor:pointer;color:var(--text2);font-size:13px;transition:all .12s;border:1px solid transparent}
+.s-item:hover{background:var(--bg3);color:var(--text)}
+.s-item.on{background:var(--glow);color:var(--accent2);border-color:rgba(124,92,191,.3)}
+.s-badge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;border-radius:10px;padding:1px 6px;font-weight:700}
+.s-foot{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border)}
+.u-row{display:flex;align-items:center;gap:8px}
+.u-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--teal));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.u-name{font-size:12px;font-weight:600}
+.u-role{font-size:10px;color:var(--text3)}
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:54px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:12px;flex-shrink:0}
+.t-title{font-size:15px;font-weight:600}
+.t-crumb{font-size:11px;color:var(--text3);margin-left:4px}
+.t-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);transition:all .12s}
+.btn:hover{color:var(--text);background:var(--bg)}
+.btn-p{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.btn-p:hover{background:var(--accent2)!important}
+.btn-g{background:rgba(63,185,80,.12)!important;color:var(--green)!important;border-color:rgba(63,185,80,.3)!important}
+.content{flex:1;overflow-y:auto;padding:22px}
+/* SCREENS */
+.screen{display:none}.screen.on{display:block}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ct{font-size:13px;font-weight:600}
+.cs{font-size:11px;color:var(--text3);margin-top:2px}
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.mb{margin-bottom:16px}
+/* KPI */
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.kl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kv{font-size:28px;font-weight:700;line-height:1.2;margin:4px 0}
+.kd{font-size:11px;display:flex;align-items:center;gap:4px}
+.ku{color:var(--red)}.kdn{color:var(--green)}.kn{color:var(--text3)}
+.kbar{margin-top:8px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.kfill{height:100%;border-radius:2px}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.br{background:rgba(248,81,73,.13);color:var(--red);border:1px solid rgba(248,81,73,.25)}
+.bo{background:rgba(227,161,79,.12);color:var(--orange);border:1px solid rgba(227,161,79,.25)}
+.by{background:rgba(212,167,44,.12);color:var(--yellow);border:1px solid rgba(212,167,44,.25)}
+.bg{background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)}
+.bb{background:rgba(88,166,255,.1);color:var(--blue);border:1px solid rgba(88,166,255,.2)}
+.bp{background:rgba(124,92,191,.15);color:var(--accent2);border:1px solid rgba(124,92,191,.3)}
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody td{padding:10px 10px;font-size:13px;color:var(--text2)}
+.ts{color:var(--text);font-weight:500}
+/* PROGRESS */
+.prog{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pf{height:100%;border-radius:3px}
+/* BAR CHART */
+.bc{display:flex;flex-direction:column;gap:9px}
+.brow{display:flex;align-items:center;gap:10px}
+.blabel{width:110px;font-size:11px;color:var(--text2);text-align:right;flex-shrink:0}
+.btrack{flex:1;height:22px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bfill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.85)}
+.bnum{width:44px;font-size:11px;color:var(--text2);text-align:right}
+/* PIPELINE */
+.pipe{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:8px;margin:14px 0}
+.pnode{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center;min-width:115px;flex-shrink:0}
+.pnode.warn{border-color:var(--orange);background:rgba(227,161,79,.07)}
+.pnode.danger{border-color:var(--red);background:rgba(248,81,73,.07)}
+.pnode.ok{border-color:var(--green);background:rgba(63,185,80,.06)}
+.pn-lbl{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.pn-val{font-size:22px;font-weight:700;margin:4px 0}
+.pn-sub{font-size:10px;color:var(--text3)}
+.parr{width:36px;flex-shrink:0;position:relative;height:2px;background:linear-gradient(90deg,var(--border),var(--accent))}
+.parr::after{content:'▶';position:absolute;right:-7px;top:-7px;font-size:10px;color:var(--accent)}
+/* COMPARISON */
+.compare{display:flex;gap:14px;margin-top:14px}
+.ccol{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px}
+.chdr{font-size:12px;font-weight:700;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+/* RISK */
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.rcell{border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:transform .15s;border:2px solid transparent}
+.rcell:hover{transform:translateY(-3px)}
+.rprohibited{background:rgba(248,81,73,.13);border-color:rgba(248,81,73,.3)}
+.rhigh{background:rgba(227,161,79,.13);border-color:rgba(227,161,79,.3)}
+.rlimited{background:rgba(88,166,255,.1);border-color:rgba(88,166,255,.25)}
+.rminimal{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.2)}
+.rcell.active{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.ri{font-size:24px;margin-bottom:6px}
+.rt{font-size:11px;font-weight:700}
+.rc{font-size:24px;font-weight:800;margin:4px 0}
+.rd{font-size:10px;color:var(--text3);line-height:1.4;margin-top:4px}
+/* SLIDER */
+.slider-wrap{display:flex;align-items:center;gap:10px;margin:6px 0}
+input[type=range]{flex:1;height:4px;background:var(--bg3);border-radius:2px;-webkit-appearance:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent2);border:2px solid #fff}
+.sv{width:36px;text-align:right;font-size:12px;font-weight:600;color:var(--accent2)}
+/* RADIO */
+.rg{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.ro{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:12px;cursor:pointer;color:var(--text2);background:var(--bg3);transition:all .12s}
+.ro.sel{border-color:var(--accent);background:var(--glow);color:var(--accent2);font-weight:600}
+/* INPUTS */
+select,input[type=text],input[type=number]{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer;width:100%}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--accent);outline:none}
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:8px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5}
+.aw{background:rgba(227,161,79,.09);border:1px solid rgba(227,161,79,.2);color:var(--orange)}
+.ae{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);color:var(--red)}
+.ai{background:rgba(88,166,255,.07);border:1px solid rgba(88,166,255,.2);color:var(--blue)}
+.aok{background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.2);color:var(--green)}
+/* STEPPER */
+.steps{display:flex;align-items:center;margin-bottom:22px}
+.step{display:flex;align-items:center;flex:1}
+.sc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;border:2px solid var(--border);background:var(--bg3);color:var(--text3)}
+.sc.done{background:var(--green);border-color:var(--green);color:#fff}
+.sc.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.st{margin-left:7px}
+.stn{font-size:11px;font-weight:600;color:var(--text2)}
+.sts{font-size:10px;color:var(--text3)}
+.sline{flex:1;height:2px;background:var(--border);margin:0 7px}
+.sline.done{background:var(--green)}
+/* METRIC ROW */
+.mrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.mrow:last-child{border-bottom:none}
+.mlbl{flex:1;font-size:13px;color:var(--text2)}
+.mbar{flex:2}
+.mval{width:60px;text-align:right;font-size:13px;font-weight:600}
+/* REPORT ITEM */
+.ritem{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.ritem:last-child{border-bottom:none}
+.rico{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.rmeta{flex:1}
+.rname{font-size:13px;font-weight:600}
+.rdate{font-size:11px;color:var(--text3)}
+/* HEAT MAP */
+.hm-row{display:flex;gap:3px;align-items:center;margin-bottom:3px}
+.hm-lbl{width:90px;font-size:10px;color:var(--text3);text-align:right;padding-right:8px;flex-shrink:0}
+.hm-cell{width:34px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+/* DIVIDER */
+.div{height:1px;background:var(--border);margin:14px 0}
+/* FORM ROW */
+.frow{display:flex;gap:12px;margin-bottom:12px}.frow>*{flex:1}
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.stit{font-size:16px;font-weight:700}
+.ssub{font-size:12px;color:var(--text3);margin-top:2px}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="s-logo">
+    <div class="s-icon">⚖</div>
+    <div><div class="s-name">AI Bias Lab</div><div class="s-sub">Internal · v1.0</div></div>
+  </div>
+  <div class="s-section">Overview</div>
+  <div class="s-item on" onclick="go('dashboard',this,'Dashboard','Overview')">📊 &nbsp;Dashboard</div>
+  <div class="s-section">Bias Laboratory</div>
+  <div class="s-item" onclick="go('generator',this,'Bias Generator','Bias Laboratory › Synthetic Injection')">🧬 &nbsp;Bias Generator</div>
+  <div class="s-item" onclick="go('benchmarks',this,'Benchmark Runner','Bias Laboratory › Benchmarks')">🎯 &nbsp;Benchmark Runner</div>
+  <div class="s-item" onclick="go('propagation',this,'Propagation Tracker','Bias Laboratory › Pipeline Tracking')">🔗 &nbsp;Propagation Tracker</div>
+  <div class="s-item" onclick="go('mitigation',this,'Mitigation Lab','Bias Laboratory › Before / After')">🛡 &nbsp;Mitigation Lab</div>
+  <div class="s-section">Analysis</div>
+  <div class="s-item" onclick="go('metrics',this,'Fairness Metrics','Analysis › Statistical Metrics')">📐 &nbsp;Fairness Metrics</div>
+  <div class="s-item" onclick="go('explainability',this,'Explainability (XAI)','Analysis › LIME / SHAP')">🔍 &nbsp;Explainability (XAI)</div>
+  <div class="s-item" onclick="go('euaiact',this,'EU AI Act Risk','Analysis › Risk Classification')">🇪🇺 &nbsp;EU AI Act Risk <span class="s-badge">2</span></div>
+  <div class="s-section">Compliance</div>
+  <div class="s-item" onclick="go('reports',this,'Audit Reports','Compliance › Export')">📄 &nbsp;Audit Reports</div>
+  <div class="s-item" onclick="go('aia',this,'AIA Workflow','Compliance › Impact Assessment')">📋 &nbsp;AIA Workflow</div>
+  <div class="s-foot">
+    <div class="u-row">
+      <div class="u-av">PV</div>
+      <div><div class="u-name">Peter Van Walsem</div><div class="u-role">IT Risk Manager</div></div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div><div class="t-title" id="ttitle">Dashboard</div><div class="t-crumb" id="tcrumb">AI Bias Laboratory › Overview</div></div>
+    <div class="t-right">
+      <span style="font-size:11px;color:var(--text3)">Last run: today 09:41</span>
+      <button class="btn">⚙ Settings</button>
+      <button class="btn btn-p" onclick="go('generator',document.querySelector('.s-item:nth-child(5)'),'Bias Generator','Bias Laboratory › Synthetic Injection')">+ New Audit</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="screen on" id="screen-dashboard">
+      <div class="g4 mb">
+        <div class="kpi"><div class="kl">Models Audited</div><div class="kv">24</div><div class="kd ku">↑ 4 this week</div><div class="kbar"><div class="kfill" style="width:70%;background:var(--accent)"></div></div></div>
+        <div class="kpi"><div class="kl">Avg Bias Score</div><div class="kv" style="color:var(--orange)">0.38</div><div class="kd ku">↑ +0.04 vs last month</div><div class="kbar"><div class="kfill" style="width:38%;background:var(--orange)"></div></div></div>
+        <div class="kpi"><div class="kl">High-Risk Findings</div><div class="kv" style="color:var(--red)">7</div><div class="kd ku">↑ 2 unresolved</div><div class="kbar"><div class="kfill" style="width:29%;background:var(--red)"></div></div></div>
+        <div class="kpi"><div class="kl">Mitigations Applied</div><div class="kv" style="color:var(--green)">18</div><div class="kd kdn">↓ avg –42% bias</div><div class="kbar"><div class="kfill" style="width:75%;background:var(--green)"></div></div></div>
+      </div>
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Bias by Protected Attribute</div><div class="cs">Avg disparate impact ratio across all models</div></div></div>
+          <div class="bc">
+            <div class="brow"><div class="blabel">Gender</div><div class="btrack"><div class="bfill" style="width:72%;background:var(--red)">0.72</div></div><div class="bnum"><span class="badge br">HIGH</span></div></div>
+            <div class="brow"><div class="blabel">Race / Ethnicity</div><div class="btrack"><div class="bfill" style="width:65%;background:var(--orange)">0.65</div></div><div class="bnum"><span class="badge bo">MED</span></div></div>
+            <div class="brow"><div class="blabel">Age</div><div class="btrack"><div class="bfill" style="width:48%;background:var(--yellow)">0.48</div></div><div class="bnum"><span class="badge by">MED</span></div></div>
+            <div class="brow"><div class="blabel">Religion</div><div class="btrack"><div class="bfill" style="width:31%;background:var(--blue)">0.31</div></div><div class="bnum"><span class="badge bb">LOW</span></div></div>
+            <div class="brow"><div class="blabel">Disability</div><div class="btrack"><div class="bfill" style="width:55%;background:var(--orange)">0.55</div></div><div class="bnum"><span class="badge bo">MED</span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Recent Audits</div><button class="btn" style="font-size:11px">View all</button></div>
+          <table>
+            <thead><tr><th>Model</th><th>Type</th><th>Risk</th><th>Score</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="ts">HR-Scorer v3.2</td><td>Regression</td><td><span class="badge br">High</span></td><td style="color:var(--red);font-weight:600">0.74</td><td><span class="badge bo">Review</span></td></tr>
+              <tr><td class="ts">Loan-Pred v1.8</td><td>Classification</td><td><span class="badge br">High</span></td><td style="color:var(--orange);font-weight:600">0.61</td><td><span class="badge bg">Mitigated</span></td></tr>
+              <tr><td class="ts">Content-Filter</td><td>NLP</td><td><span class="badge bo">Limited</span></td><td style="color:var(--yellow);font-weight:600">0.44</td><td><span class="badge bg">Passed</span></td></tr>
+              <tr><td class="ts">Sentiment-v2</td><td>NLP</td><td><span class="badge bb">Minimal</span></td><td style="color:var(--green);font-weight:600">0.22</td><td><span class="badge bg">Passed</span></td></tr>
+              <tr><td class="ts">CV-Ranker-Pro</td><td>Ranking</td><td><span class="badge br">High</span></td><td style="color:var(--red);font-weight:600">0.81</td><td><span class="badge bp">Running</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="g3 mb">
+        <div class="card">
+          <div class="ch"><div class="ct">EU AI Act Status</div></div>
+          <div class="rgrid" style="grid-template-columns:1fr 1fr;gap:8px">
+            <div class="rcell rprohibited"><div class="ri">🚫</div><div class="rt" style="color:var(--red)">Prohibited</div><div class="rc" style="color:var(--red)">1</div></div>
+            <div class="rcell rhigh"><div class="ri">⚠️</div><div class="rt" style="color:var(--orange)">High Risk</div><div class="rc" style="color:var(--orange)">6</div></div>
+            <div class="rcell rlimited"><div class="ri">ℹ️</div><div class="rt" style="color:var(--blue)">Limited</div><div class="rc" style="color:var(--blue)">9</div></div>
+            <div class="rcell rminimal"><div class="ri">✅</div><div class="rt" style="color:var(--green)">Minimal</div><div class="rc" style="color:var(--green)">8</div></div>
+          </div>
+        </div>
+        <div class="card" style="grid-column:span 2">
+          <div class="ch"><div class="ct">Open Action Items</div><span class="badge br">3 Critical</span></div>
+          <div class="alert ae">🚨 <strong>CV-Ranker-Pro</strong> — Gender bias score 0.81 exceeds threshold. Mitigation required before deployment.</div>
+          <div class="alert aw">⚠️ <strong>HR-Scorer v3.2</strong> — Equalized odds violation detected for Age attribute. Under review.</div>
+          <div class="alert ai">ℹ️ <strong>Loan-Pred v1.8</strong> — Audit report pending legal sign-off (due tomorrow).</div>
+          <div class="alert aok">✅ <strong>Content-Filter</strong> — All fairness metrics within acceptable range. Report generated.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ BIAS GENERATOR ══ -->
+    <div class="screen" id="screen-generator">
+      <div class="alert ai mb">💡 Configure synthetic bias injection parameters. The generator uses LLM templates to create controllable bias datasets for testing your model's fairness robustness.</div>
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Target Model</div><div class="cs">Select the model to inject synthetic bias into</div></div></div>
+          <div style="margin-bottom:12px"><label>Model Name</label><input type="text" value="CV-Ranker-Pro v2.1"></div>
+          <div class="frow">
+            <div><label>Model Type</label><select><option>Classification</option><option>Regression</option><option>Ranking</option><option>NLP / Text</option></select></div>
+            <div><label>Framework</label><select><option>HuggingFace</option><option>PyTorch</option><option>Scikit-learn</option><option>TensorFlow</option></select></div>
+          </div>
+          <div class="div"></div>          <div class="ct" style="margin-bottom:12px">Protected Attributes to Test</div>
+          <div class="rg">
+            <div class="ro sel">👤 Gender</div>
+            <div class="ro sel">🌍 Race / Ethnicity</div>
+            <div class="ro sel">🎂 Age</div>
+            <div class="ro">🕌 Religion</div>
+            <div class="ro sel">♿ Disability</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div><div class="ct">Bias Injection Settings</div><div class="cs">Control bias strength and distribution</div></div></div>
+          <div style="margin-bottom:14px">
+            <label>Bias Intensity — <span style="color:var(--accent2)">Moderate</span></label>
+            <div class="slider-wrap"><input type="range" min="0" max="100" value="55" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="sv">55%</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>Mild</span><span>Moderate</span><span>Severe</span></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <label>Sample Size</label>
+            <div class="frow"><div><input type="number" value="10000"></div><div><select><option>Balanced</option><option>Weighted</option><option>Real distribution</option></select></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <label>Injection Method</label>
+            <div class="rg">
+              <div class="ro sel">Label Flip</div>
+              <div class="ro">Feature Skew</div>
+              <div class="ro">Sampling Bias</div>
+              <div class="ro">Proxy Features</div>
+            </div>
+          </div>
+          <div><label>Random Seed (reproducibility)</label><input type="number" value="42"></div>
+        </div>
+      </div>
+      <div class="card mb">
+        <div class="ch"><div class="ct">Bias Injection Preview</div><span class="badge bp">Simulation Mode</span></div>
+        <div class="g3">
+          <div style="text-align:center;padding:12px 0">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Input Bias Level</div>
+            <div style="font-size:36px;font-weight:800;color:var(--blue)">0.00</div>
+            <div style="font-size:11px;color:var(--text3)">Clean / Baseline</div>
+          </div>
+          <div style="text-align:center;padding:12px 0;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Injected Bias</div>
+            <div style="font-size:36px;font-weight:800;color:var(--orange)">0.55</div>
+            <div style="font-size:11px;color:var(--text3)">Moderate (configured)</div>
+          </div>
+          <div style="text-align:center;padding:12px 0">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Est. Amplification</div>
+            <div style="font-size:36px;font-weight:800;color:var(--red)">×1.8</div>
+            <div style="font-size:11px;color:var(--text3)">After model processing</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn">💾 Save Config</button>
+        <button class="btn btn-p">▶ Run Injection Test</button>
+      </div>
+    </div>
+
+    <!-- ══ BENCHMARKS ══ -->
+    <div class="screen" id="screen-benchmarks">
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Select Benchmarks</div><div class="cs">Standard fairness evaluation suites</div></div></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;padding:10px;background:var(--glow);border:1px solid rgba(124,92,191,.3);border-radius:8px;gap:10px">
+              <input type="checkbox" checked style="accent-color:var(--accent);width:14px;height:14px">
+              <div style="flex:1"><div style="font-size:13px;font-weight:600">BBQ (Bias Benchmark for QA)</div><div style="font-size:11px;color:var(--text3)">9 social categories · 58,492 examples</div></div>
+              <span class="badge bp">Active</span>
+            </div>
+            <div style="display:flex;align-items:center;padding:10px;background:var(--glow);border:1px solid rgba(124,92,191,.3);border-radius:8px;gap:10px">
+              <input type="checkbox" checked style="accent-color:var(--accent);width:14px;height:14px">
+              <div style="flex:1"><div style="font-size:13px;font-weight:600">CrowS-Pairs</div><div style="font-size:11px;color:var(--text3)">9 bias categories · 1,508 sentence pairs</div></div>
+              <span class="badge bp">Active</span>
+            </div>
+            <div style="display:flex;align-items:center;padding:10px;background:var(--glow);border:1px solid rgba(124,92,191,.3);border-radius:8px;gap:10px">
+              <input type="checkbox" checked style="accent-color:var(--accent);width:14px;height:14px">
+              <div style="flex:1"><div style="font-size:13px;font-weight:600">WinoBias</div><div style="font-size:11px;color:var(--text3)">Gender bias in coreference · 3,160 examples</div></div>
+              <span class="badge bp">Active</span>
+            </div>
+            <div style="display:flex;align-items:center;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;gap:10px">
+              <input type="checkbox" style="accent-color:var(--accent);width:14px;height:14px">
+              <div style="flex:1"><div style="font-size:13px;font-weight:600">Custom Template</div><div style="font-size:11px;color:var(--text3)">Upload your own evaluation dataset</div></div>
+              <button class="btn" style="font-size:11px">+ Upload</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div><div class="ct">Last Run Results</div><div class="cs">CV-Ranker-Pro · 2026-05-29 09:41</div></div><span class="badge br">3 Failures</span></div>
+          <table>
+            <thead><tr><th>Benchmark</th><th>Score</th><th>Threshold</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td class="ts">BBQ</td><td style="color:var(--red);font-weight:600">0.78</td><td>≤0.50</td><td><span class="badge br">FAIL</span></td></tr>
+              <tr><td class="ts">CrowS-Pairs</td><td style="color:var(--orange);font-weight:600">0.64</td><td>≤0.50</td><td><span class="badge br">FAIL</span></td></tr>
+              <tr><td class="ts">WinoBias</td><td style="color:var(--orange);font-weight:600">0.59</td><td>≤0.55</td><td><span class="badge br">FAIL</span></td></tr>
+              <tr><td class="ts">Custom: HR-2026</td><td style="color:var(--green);font-weight:600">0.41</td><td>≤0.50</td><td><span class="badge bg">PASS</span></td></tr>
+            </tbody>
+          </table>
+          <div class="div"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn">📥 Export Results</button><button class="btn btn-p">▶ Re-Run All</button></div>
+        </div>
+      </div>
+      <div class="card mb">
+        <div class="ch"><div><div class="ct">Benchmark Score Trends</div><div class="cs">Last 6 runs — CV-Ranker-Pro</div></div></div>
+        <svg viewBox="0 0 700 120" style="width:100%;height:120px">
+          <defs><linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f85149" stop-opacity=".3"/><stop offset="100%" stop-color="#f85149" stop-opacity="0"/></linearGradient></defs>
+          <line x1="0" y1="60" x2="700" y2="60" stroke="#30363d" stroke-dasharray="4"/>
+          <text x="5" y="63" fill="#6e7681" font-size="9">0.50 threshold</text>
+          <polyline points="50,90 150,85 250,80 350,75 450,70 650,47" fill="none" stroke="#f85149" stroke-width="2" stroke-linejoin="round"/>
+          <polyline points="50,90 150,85 250,80 350,75 450,70 650,47" fill="url(#lg1)"/>
+          <circle cx="650" cy="47" r="4" fill="#f85149"/>
+          <polyline points="50,95 150,92 250,88 350,82 450,72 650,52" fill="none" stroke="#e3a14f" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6,3"/>
+          <circle cx="650" cy="52" r="4" fill="#e3a14f"/>
+          <text x="660" y="50" fill="#f85149" font-size="9">BBQ</text>
+          <text x="660" y="56" fill="#e3a14f" font-size="9">CrowS</text>
+          <text x="50" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Run 1</text>
+          <text x="150" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Run 2</text>
+          <text x="250" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Run 3</text>
+          <text x="350" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Run 4</text>
+          <text x="450" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Run 5</text>
+          <text x="650" y="112" fill="#6e7681" font-size="9" text-anchor="middle">Today</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ══ PROPAGATION TRACKER ══ -->
+    <div class="screen" id="screen-propagation">
+      <div class="alert aw mb">⚠️ <strong>CV-Ranker-Pro</strong> — Bias is amplifying significantly between the Embedding layer and Output. Bias Amplification Factor: ×2.3</div>
+      <div class="card mb">
+        <div class="ch"><div><div class="ct">Bias Propagation Pipeline</div><div class="cs">How bias flows through each stage of the model</div></div><span class="badge br">High Amplification</span></div>
+        <div class="pipe">
+          <div class="pnode ok"><div class="pn-lbl">Input Data</div><div class="pn-val" style="color:var(--green)">0.12</div><div class="pn-sub">Baseline</div></div>
+          <div class="parr"></div>
+          <div class="pnode warn"><div class="pn-lbl">Preprocessing</div><div class="pn-val" style="color:var(--yellow)">0.19</div><div class="pn-sub">+58%</div></div>
+          <div class="parr"></div>
+          <div class="pnode warn"><div class="pn-lbl">Tokenizer</div><div class="pn-val" style="color:var(--orange)">0.27</div><div class="pn-sub">+42%</div></div>
+          <div class="parr"></div>
+          <div class="pnode danger"><div class="pn-lbl">Embeddings</div><div class="pn-val" style="color:var(--red)">0.51</div><div class="pn-sub">+89% ⚠</div></div>
+          <div class="parr"></div>
+          <div class="pnode danger"><div class="pn-lbl">Hidden Layers</div><div class="pn-val" style="color:var(--red)">0.66</div><div class="pn-sub">+29%</div></div>
+          <div class="parr"></div>
+          <div class="pnode danger"><div class="pn-lbl">Output Dist.</div><div class="pn-val" style="color:var(--red)">0.81</div><div class="pn-sub">×2.3 total</div></div>
+        </div>
+      </div>
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div class="ct">Stage-by-Stage Breakdown</div></div>
+          <div class="bc">
+            <div class="brow"><div class="blabel">Input Data</div><div class="btrack"><div class="bfill" style="width:15%;background:var(--green)">0.12</div></div><div class="bnum" style="color:var(--green)">+0%</div></div>
+            <div class="brow"><div class="blabel">Preprocessing</div><div class="btrack"><div class="bfill" style="width:24%;background:var(--yellow)">0.19</div></div><div class="bnum" style="color:var(--yellow)">+58%</div></div>
+            <div class="brow"><div class="blabel">Tokenizer</div><div class="btrack"><div class="bfill" style="width:34%;background:var(--orange)">0.27</div></div><div class="bnum" style="color:var(--orange)">+42%</div></div>
+            <div class="brow"><div class="blabel">Embeddings</div><div class="btrack"><div class="bfill" style="width:64%;background:var(--red)">0.51</div></div><div class="bnum" style="color:var(--red)">+89%</div></div>
+            <div class="brow"><div class="blabel">Hidden Layers</div><div class="btrack"><div class="bfill" style="width:83%;background:var(--red)">0.66</div></div><div class="bnum" style="color:var(--red)">+29%</div></div>
+            <div class="brow"><div class="blabel">Output Dist.</div><div class="btrack"><div class="bfill" style="width:100%;background:var(--red)">0.81</div></div><div class="bnum" style="color:var(--red)">×2.3</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Protected Attribute Heatmap</div><div class="cs">Bias intensity per stage per attribute</div></div>
+          <div style="overflow-x:auto">
+            <div style="font-size:9px;color:var(--text3);display:flex;gap:3px;padding-left:98px;margin-bottom:3px">
+              <div style="width:34px;text-align:center">Input</div>
+              <div style="width:34px;text-align:center">Prep</div>
+              <div style="width:34px;text-align:center">Embed</div>
+              <div style="width:34px;text-align:center">Hidden</div>
+              <div style="width:34px;text-align:center">Output</div>
+            </div>
+            <div class="hm-row"><div class="hm-lbl">Gender</div><div class="hm-cell" style="background:rgba(63,185,80,.4);color:var(--text)">0.15</div><div class="hm-cell" style="background:rgba(227,161,79,.4);color:var(--text)">0.32</div><div class="hm-cell" style="background:rgba(248,81,73,.7);color:var(--text)">0.71</div><div class="hm-cell" style="background:rgba(248,81,73,.8);color:var(--text)">0.79</div><div class="hm-cell" style="background:rgba(248,81,73,.9);color:var(--text)">0.88</div></div>
+            <div class="hm-row"><div class="hm-lbl">Race/Ethn.</div><div class="hm-cell" style="background:rgba(63,185,80,.35);color:var(--text)">0.11</div><div class="hm-cell" style="background:rgba(88,166,255,.3);color:var(--text)">0.18</div><div class="hm-cell" style="background:rgba(227,161,79,.5);color:var(--text)">0.41</div><div class="hm-cell" style="background:rgba(248,81,73,.5);color:var(--text)">0.58</div><div class="hm-cell" style="background:rgba(248,81,73,.65);color:var(--text)">0.72</div></div>
+            <div class="hm-row"><div class="hm-lbl">Age</div><div class="hm-cell" style="background:rgba(63,185,80,.3);color:var(--text)">0.09</div><div class="hm-cell" style="background:rgba(63,185,80,.4);color:var(--text)">0.14</div><div class="hm-cell" style="background:rgba(88,166,255,.35);color:var(--text)">0.28</div><div class="hm-cell" style="background:rgba(227,161,79,.45);color:var(--text)">0.39</div><div class="hm-cell" style="background:rgba(227,161,79,.6);color:var(--text)">0.52</div></div>
+            <div class="hm-row"><div class="hm-lbl">Religion</div><div class="hm-cell" style="background:rgba(63,185,80,.2);color:var(--text)">0.07</div><div class="hm-cell" style="background:rgba(63,185,80,.25);color:var(--text)">0.09</div><div class="hm-cell" style="background:rgba(63,185,80,.35);color:var(--text)">0.16</div><div class="hm-cell" style="background:rgba(88,166,255,.3);color:var(--text)">0.22</div><div class="hm-cell" style="background:rgba(88,166,255,.4);color:var(--text)">0.29</div></div>
+            <div class="hm-row"><div class="hm-lbl">Disability</div><div class="hm-cell" style="background:rgba(88,166,255,.3);color:var(--text)">0.13</div><div class="hm-cell" style="background:rgba(88,166,255,.35);color:var(--text)">0.21</div><div class="hm-cell" style="background:rgba(227,161,79,.4);color:var(--text)">0.38</div><div class="hm-cell" style="background:rgba(227,161,79,.55);color:var(--text)">0.49</div><div class="hm-cell" style="background:rgba(248,81,73,.55);color:var(--text)">0.63</div></div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:12px;font-size:10px;color:var(--text3);align-items:center">
+            <span>Scale:</span>
+            <div style="display:flex;gap:3px;align-items:center"><div style="width:12px;height:12px;border-radius:2px;background:rgba(63,185,80,.4)"></div>Low</div>
+            <div style="display:flex;gap:3px;align-items:center"><div style="width:12px;height:12px;border-radius:2px;background:rgba(227,161,79,.5)"></div>Med</div>
+            <div style="display:flex;gap:3px;align-items:center"><div style="width:12px;height:12px;border-radius:2px;background:rgba(248,81,73,.8)"></div>High</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MITIGATION LAB ══ -->
+    <div class="screen" id="screen-mitigation">
+      <div class="alert ai mb">🛡 Apply mitigation techniques and compare their effectiveness side-by-side. All results are reproducible with fixed random seed.</div>
+      <div class="compare mb">
+        <div class="ccol">
+          <div class="chdr"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Before Mitigation — Baseline</div>
+          <div class="mrow"><div class="mlbl">Statistical Parity Diff.</div><div class="mbar"><div class="prog"><div class="pf" style="width:74%;background:var(--red)"></div></div></div><div class="mval" style="color:var(--red)">0.74</div></div>
+          <div class="mrow"><div class="mlbl">Equalized Odds</div><div class="mbar"><div class="prog"><div class="pf" style="width:68%;background:var(--red)"></div></div></div><div class="mval" style="color:var(--red)">0.68</div></div>
+          <div class="mrow"><div class="mlbl">Disparate Impact Ratio</div><div class="mbar"><div class="prog"><div class="pf" style="width:81%;background:var(--red)"></div></div></div><div class="mval" style="color:var(--red)">0.81</div></div>
+          <div class="mrow"><div class="mlbl">Predictive Parity</div><div class="mbar"><div class="prog"><div class="pf" style="width:61%;background:var(--orange)"></div></div></div><div class="mval" style="color:var(--orange)">0.61</div></div>
+          <div style="margin-top:14px;text-align:center"><div style="font-size:28px;font-weight:800;color:var(--red)">Score: 0.71</div><div style="font-size:11px;color:var(--text3)">Overall Bias Score</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 10px;gap:6px">
+          <div style="font-size:20px">→</div>
+          <div style="font-size:10px;color:var(--text3);text-align:center">Apply<br>Mitigation</div>
+        </div>
+        <div class="ccol">
+          <div class="chdr"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> After Mitigation — Adversarial Debiasing</div>
+          <div class="mrow"><div class="mlbl">Statistical Parity Diff.</div><div class="mbar"><div class="prog"><div class="pf" style="width:31%;background:var(--green)"></div></div></div><div class="mval" style="color:var(--green)">0.31</div></div>
+          <div class="mrow"><div class="mlbl">Equalized Odds</div><div class="mbar"><div class="prog"><div class="pf" style="width:28%;background:var(--green)"></div></div></div><div class="mval" style="color:var(--green)">0.28</div></div>
+          <div class="mrow"><div class="mlbl">Disparate Impact Ratio</div><div class="mbar"><div class="prog"><div class="pf" style="width:34%;background:var(--yellow)"></div></div></div><div class="mval" style="color:var(--yellow)">0.34</div></div>
+          <div class="mrow"><div class="mlbl">Predictive Parity</div><div class="mbar"><div class="prog"><div class="pf" style="width:22%;background:var(--green)"></div></div></div><div class="mval" style="color:var(--green)">0.22</div></div>
+          <div style="margin-top:14px;text-align:center"><div style="font-size:28px;font-weight:800;color:var(--green)">Score: 0.29</div><div style="font-size:11px;color:var(--text3)">–59% reduction ✅</div></div>
+        </div>
+      </div>
+      <div class="card mb">
+        <div class="ch"><div><div class="ct">Mitigation Technique Comparison</div><div class="cs">Select technique to apply in the right panel</div></div></div>
+        <table>
+          <thead><tr><th></th><th>Technique</th><th>Stat. Parity</th><th>Eq. Odds</th><th>Disp. Impact</th><th>Effectiveness</th><th>Speed</th></tr></thead>
+          <tbody>
+            <tr><td><input type="radio" name="mit" checked style="accent-color:var(--accent)"></td><td class="ts">Adversarial Debiasing</td><td style="color:var(--green)">0.31</td><td style="color:var(--green)">0.28</td><td style="color:var(--yellow)">0.34</td><td><span class="badge bg">–59%</span></td><td style="color:var(--text3)">~4 min</td></tr>
+            <tr><td><input type="radio" name="mit" style="accent-color:var(--accent)"></td><td class="ts">Counterfactual Augment.</td><td style="color:var(--yellow)">0.38</td><td style="color:var(--yellow)">0.41</td><td style="color:var(--orange)">0.47</td><td><span class="badge by">–46%</span></td><td style="color:var(--text3)">~2 min</td></tr>
+            <tr><td><input type="radio" name="mit" style="accent-color:var(--accent)"></td><td class="ts">RLHF Preference Tuning</td><td style="color:var(--yellow)">0.42</td><td style="color:var(--orange)">0.49</td><td style="color:var(--orange)">0.51</td><td><span class="badge by">–38%</span></td><td style="color:var(--text3)">~12 min</td></tr>
+            <tr><td><input type="radio" name="mit" style="accent-color:var(--accent)"></td><td class="ts">RAG-Level Filtering</td><td style="color:var(--orange)">0.45</td><td style="color:var(--orange)">0.52</td><td style="color:var(--red)">0.61</td><td><span class="badge bo">–29%</span></td><td style="color:var(--text3)">~1 min</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ FAIRNESS METRICS ══ -->
+    <div class="screen" id="screen-metrics">
+      <div class="g3 mb">
+        <div class="kpi"><div class="kl">Stat. Parity Diff.</div><div class="kv" style="color:var(--red)">0.74</div><div class="kd ku">Threshold: ≤0.10</div><div class="kbar"><div class="kfill" style="width:74%;background:var(--red)"></div></div></div>
+        <div class="kpi"><div class="kl">Equalized Odds</div><div class="kv" style="color:var(--red)">0.68</div><div class="kd ku">Threshold: ≤0.15</div><div class="kbar"><div class="kfill" style="width:68%;background:var(--red)"></div></div></div>
+        <div class="kpi"><div class="kl">Disparate Impact</div><div class="kv" style="color:var(--orange)">0.81</div><div class="kd ku">Threshold: ≥0.80 (80% rule)</div><div class="kbar"><div class="kfill" style="width:81%;background:var(--orange)"></div></div></div>
+      </div>
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Metrics by Group</div><div class="cs">CV-Ranker-Pro — Gender attribute</div></div></div>
+          <table>
+            <thead><tr><th>Group</th><th>Selection Rate</th><th>TPR</th><th>FPR</th><th>Parity Gap</th></tr></thead>
+            <tbody>
+              <tr><td class="ts">Male (reference)</td><td>68.4%</td><td>0.82</td><td>0.18</td><td>—</td></tr>
+              <tr><td class="ts">Female</td><td style="color:var(--red)">41.2%</td><td style="color:var(--red)">0.53</td><td>0.21</td><td><span class="badge br">–27.2pp</span></td></tr>
+              <tr><td class="ts">Non-binary</td><td style="color:var(--orange)">44.8%</td><td style="color:var(--orange)">0.57</td><td>0.22</td><td><span class="badge bo">–23.6pp</span></td></tr>
+            </tbody>
+          </table>
+          <div class="div"></div>
+          <div class="ch"><div class="ct">Aequitas Fairness Tree</div></div>
+          <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:12px;font-family:monospace;line-height:1.8;color:var(--text2)">
+            <div>📊 <span style="color:var(--text)">Fairness Check — CV-Ranker-Pro</span></div>
+            <div style="padding-left:16px">├─ Group Fairness: <span style="color:var(--red)">FAIL ✗</span></div>
+            <div style="padding-left:16px">│ &nbsp;├─ Statistical Parity: <span style="color:var(--red)">FAIL (diff=0.74)</span></div>
+            <div style="padding-left:16px">│ &nbsp;└─ Impact Parity: <span style="color:var(--orange)">WARN (ratio=0.81)</span></div>
+            <div style="padding-left:16px">├─ Individual Fairness: <span style="color:var(--yellow)">PARTIAL ⚠</span></div>
+            <div style="padding-left:16px">│ &nbsp;├─ Counterfactual: <span style="color:var(--orange)">WARN</span></div>
+            <div style="padding-left:16px">│ &nbsp;└─ Consistency: <span style="color:var(--green)">PASS ✓</span></div>
+            <div style="padding-left:16px">└─ Calibration: <span style="color:var(--green)">PASS ✓</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div><div class="ct">Bias Amplification Factor</div><div class="cs">Output bias ÷ input bias ratio</div></div></div>
+          <div style="text-align:center;padding:20px 0">
+            <div style="font-size:56px;font-weight:800;color:var(--red)">×2.3</div>
+            <div style="font-size:14px;color:var(--text3);margin-top:4px">Amplification Factor (Gender)</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Input: 0.35 → Output: 0.81</div>
+          </div>
+          <div class="div"></div>
+          <div class="ch"><div class="ct">Mitigation Effectiveness</div></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Adversarial Debiasing</span><span style="color:var(--green);font-weight:600">–59%</span></div><div class="prog"><div class="pf" style="width:59%;background:var(--green)"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Counterfactual Augment.</span><span style="color:var(--yellow);font-weight:600">–46%</span></div><div class="prog"><div class="pf" style="width:46%;background:var(--yellow)"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">RLHF Preference Tuning</span><span style="color:var(--yellow);font-weight:600">–38%</span></div><div class="prog"><div class="pf" style="width:38%;background:var(--yellow)"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">RAG-Level Filtering</span><span style="color:var(--orange);font-weight:600">–29%</span></div><div class="prog"><div class="pf" style="width:29%;background:var(--orange)"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ EXPLAINABILITY ══ -->
+    <div class="screen" id="screen-explainability">
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">SHAP Feature Importance</div><div class="cs">Top drivers of biased output — CV-Ranker-Pro</div></div><span class="badge bp">SHAP</span></div>
+          <div class="bc" style="margin-top:8px">
+            <div class="brow"><div class="blabel">job_title_senior</div><div class="btrack"><div class="bfill" style="width:88%;background:var(--red)">SHAP: 0.88</div></div><div class="bnum" style="color:var(--red)">Proxy</div></div>
+            <div class="brow"><div class="blabel">university_name</div><div class="btrack"><div class="bfill" style="width:73%;background:var(--orange)">0.73</div></div><div class="bnum" style="color:var(--orange)">Proxy</div></div>
+            <div class="brow"><div class="blabel">years_experience</div><div class="btrack"><div class="bfill" style="width:61%;background:var(--orange)">0.61</div></div><div class="bnum" style="color:var(--orange)">Proxy</div></div>
+            <div class="brow"><div class="blabel">skills_count</div><div class="btrack"><div class="bfill" style="width:44%;background:var(--yellow)">0.44</div></div><div class="bnum" style="color:var(--yellow)">OK</div></div>
+            <div class="brow"><div class="blabel">location_city</div><div class="btrack"><div class="bfill" style="width:38%;background:var(--yellow)">0.38</div></div><div class="bnum" style="color:var(--yellow)">Check</div></div>
+            <div class="brow"><div class="blabel">education_level</div><div class="btrack"><div class="bfill" style="width:28%;background:var(--blue)">0.28</div></div><div class="bnum" style="color:var(--blue)">Low</div></div>
+            <div class="brow"><div class="blabel">previous_salary</div><div class="btrack"><div class="bfill" style="width:21%;background:var(--blue)">0.21</div></div><div class="bnum" style="color:var(--blue)">Low</div></div>
+          </div>
+          <div class="alert aw" style="margin-top:12px">⚠️ <strong>job_title_senior</strong> and <strong>university_name</strong> are likely proxy variables for gender/race. Review and consider removal.</div>
+        </div>
+        <div class="card">
+          <div class="ch"><div><div class="ct">LIME Local Explanation</div><div class="cs">Explaining a single high-disparity prediction</div></div><span class="badge bb">LIME</span></div>
+          <div style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:12px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Candidate #4821 — Female, Age 32</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><div style="font-size:20px;font-weight:700;color:var(--red)">Score: 0.21</div><div style="font-size:11px;color:var(--text3)">Ranked: 847 / 1000</div></div>
+              <div><div style="font-size:11px;color:var(--text3)">Counterfactual (Male):</div><div style="font-size:20px;font-weight:700;color:var(--green)">Score: 0.79</div></div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600">Feature Contributions to Low Score:</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px"><div style="width:120px;color:var(--red)">job_title_senior: No</div><div class="prog" style="flex:1"><div class="pf" style="width:45%;background:var(--red)"></div></div><div style="color:var(--red);width:40px;text-align:right">–0.45</div></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px"><div style="width:120px;color:var(--orange)">uni_ranking: 450</div><div class="prog" style="flex:1"><div class="pf" style="width:28%;background:var(--orange)"></div></div><div style="color:var(--orange);width:40px;text-align:right">–0.28</div></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px"><div style="width:120px;color:var(--green)">skills_count: 18</div><div class="prog" style="flex:1"><div class="pf" style="width:22%;background:var(--green)"></div></div><div style="color:var(--green);width:40px;text-align:right">+0.22</div></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px"><div style="width:120px;color:var(--green)">experience_yrs: 8</div><div class="prog" style="flex:1"><div class="pf" style="width:15%;background:var(--green)"></div></div><div style="color:var(--green);width:40px;text-align:right">+0.15</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ EU AI ACT ══ -->
+    <div class="screen" id="screen-euaiact">
+      <div class="alert ae mb">🇪🇺 <strong>2 models</strong> require immediate attention: CV-Ranker-Pro (Prohibited use-case) and HR-Scorer (High-Risk, documentation incomplete).</div>
+      <div class="rgrid mb">
+        <div class="rcell rprohibited active">
+          <div class="ri">🚫</div>
+          <div class="rt" style="color:var(--red)">PROHIBITED</div>
+          <div class="rc" style="color:var(--red)">1</div>
+          <div class="rd">Real-time biometric, social scoring, mass surveillance</div>
+        </div>
+        <div class="rcell rhigh">
+          <div class="ri">⚠️</div>
+          <div class="rt" style="color:var(--orange)">HIGH RISK</div>
+          <div class="rc" style="color:var(--orange)">6</div>
+          <div class="rd">HR, credit, law enforcement, education, critical infra</div>
+        </div>
+        <div class="rcell rlimited">
+          <div class="ri">ℹ️</div>
+          <div class="rt" style="color:var(--blue)">LIMITED RISK</div>
+          <div class="rc" style="color:var(--blue)">9</div>
+          <div class="rd">Chatbots, emotion recognition, deep fakes</div>
+        </div>
+        <div class="rcell rminimal">
+          <div class="ri">✅</div>
+          <div class="rt" style="color:var(--green)">MINIMAL RISK</div>
+          <div class="rc" style="color:var(--green)">8</div>
+          <div class="rd">Spam filters, AI in games, recommendation systems</div>
+        </div>
+      </div>
+      <div class="card mb">
+        <div class="ch"><div class="ct">Model Risk Register</div><button class="btn">📥 Export Register</button></div>
+        <table>
+          <thead><tr><th>Model</th><th>Use Case</th><th>Classification</th><th>Conformity</th><th>Docs</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="ts">FaceMatch-v1</td><td>Real-time biometric ID</td>
+              <td><span class="badge br">Prohibited</span></td>
+              <td style="color:var(--red)">Non-compliant</td>
+              <td><span class="badge br">Missing</span></td>
+              <td><button class="btn" style="font-size:11px;color:var(--red)">Halt</button></td>
+            </tr>
+            <tr>
+              <td class="ts">CV-Ranker-Pro</td><td>Employment screening</td>
+              <td><span class="badge bo">High Risk</span></td>
+              <td style="color:var(--orange)">Partial</td>
+              <td><span class="badge by">Incomplete</span></td>
+              <td><button class="btn" style="font-size:11px">Review</button></td>
+            </tr>
+            <tr>
+              <td class="ts">HR-Scorer v3.2</td><td>Performance evaluation</td>
+              <td><span class="badge bo">High Risk</span></td>
+              <td style="color:var(--orange)">Partial</td>
+              <td><span class="badge by">In Progress</span></td>
+              <td><button class="btn" style="font-size:11px">Review</button></td>
+            </tr>
+            <tr>
+              <td class="ts">Loan-Pred v1.8</td><td>Credit scoring</td>
+              <td><span class="badge bo">High Risk</span></td>
+              <td style="color:var(--green)">Compliant</td>
+              <td><span class="badge bg">Complete</span></td>
+              <td><button class="btn" style="font-size:11px">View</button></td>
+            </tr>
+            <tr>
+              <td class="ts">Sentiment-v2</td><td>Customer feedback</td>
+              <td><span class="badge bb">Limited</span></td>
+              <td style="color:var(--green)">Compliant</td>
+              <td><span class="badge bg">Complete</span></td>
+              <td><button class="btn" style="font-size:11px">View</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ AUDIT REPORTS ══ -->
+    <div class="screen" id="screen-reports">
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Generate New Report</div><div class="cs">Export audit results for compliance submission</div></div></div>
+          <div style="margin-bottom:12px"><label>Model</label><select><option>CV-Ranker-Pro v2.1</option><option>HR-Scorer v3.2</option><option>Loan-Pred v1.8</option></select></div>
+          <div class="frow">
+            <div><label>Report Type</label><select><option>Full Audit</option><option>Fairness Summary</option><option>Regulatory Submission</option></select></div>
+            <div><label>Format</label><select><option>PDF</option><option>JSON</option><option>Both</option></select></div>
+          </div>
+          <div style="margin-bottom:12px"><label>Include Sections</label>
+            <div class="rg" style="margin-top:6px">
+              <div class="ro sel">Executive Summary</div>
+              <div class="ro sel">Metrics Detail</div>
+              <div class="ro sel">Compliance Gaps</div>
+              <div class="ro sel">Mitigation Results</div>
+              <div class="ro">Raw Data</div>
+            </div>
+          </div>
+          <button class="btn btn-p" style="width:100%">📄 Generate Report</button>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Recent Reports</div></div>
+          <div class="ritem"><div class="rico" style="background:rgba(248,81,73,.15)">📋</div><div class="rmeta"><div class="rname">CV-Ranker-Pro — Full Audit</div><div class="rdate">2026-05-29 · PDF + JSON · 24 pages</div></div><div style="display:flex;gap:6px"><button class="btn" style="font-size:11px">PDF</button><button class="btn" style="font-size:11px">JSON</button></div></div>
+          <div class="ritem"><div class="rico" style="background:rgba(63,185,80,.1)">📋</div><div class="rmeta"><div class="rname">Loan-Pred v1.8 — Regulatory</div><div class="rdate">2026-05-27 · PDF · 18 pages</div></div><div style="display:flex;gap:6px"><button class="btn" style="font-size:11px">PDF</button></div></div>
+          <div class="ritem"><div class="rico" style="background:rgba(88,166,255,.1)">📋</div><div class="rmeta"><div class="rname">Content-Filter — Summary</div><div class="rdate">2026-05-24 · PDF · 9 pages</div></div><div style="display:flex;gap:6px"><button class="btn" style="font-size:11px">PDF</button></div></div>
+          <div class="ritem"><div class="rico" style="background:rgba(124,92,191,.15)">📋</div><div class="rmeta"><div class="rname">Sentiment-v2 — Fairness</div><div class="rdate">2026-05-20 · JSON · 2 MB</div></div><div style="display:flex;gap:6px"><button class="btn" style="font-size:11px">JSON</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ AIA WORKFLOW ══ -->
+    <div class="screen" id="screen-aia">
+      <div class="steps mb">
+        <div class="step"><div class="sc done">✓</div><div class="st"><div class="stn">Model Purpose</div><div class="sts">Completed</div></div></div>
+        <div class="sline done"></div>
+        <div class="step"><div class="sc done">✓</div><div class="st"><div class="stn">Stakeholder Map</div><div class="sts">Completed</div></div></div>
+        <div class="sline done"></div>
+        <div class="step"><div class="sc active">3</div><div class="st"><div class="stn">Risk Assessment</div><div class="sts" style="color:var(--accent2)">In Progress</div></div></div>
+        <div class="sline"></div>
+        <div class="step"><div class="sc">4</div><div class="st"><div class="stn">Limitations</div><div class="sts">Pending</div></div></div>
+        <div class="sline"></div>
+        <div class="step"><div class="sc">5</div><div class="st"><div class="stn">Community Impact</div><div class="sts">Pending</div></div></div>
+        <div class="sline"></div>
+        <div class="step"><div class="sc">6</div><div class="st"><div class="stn">Sign-off</div><div class="sts">Pending</div></div></div>
+      </div>
+      <div class="g2 mb">
+        <div class="card">
+          <div class="ch"><div><div class="ct">Step 3: Risk Assessment</div><div class="cs">Aligned with NIST AI RMF</div></div><span class="badge bp">Active</span></div>
+          <div style="margin-bottom:14px">
+            <label>Intended Use Cases</label>
+            <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;height:80px;resize:none">CV-Ranker-Pro is intended to assist HR teams in initial screening of job applications. It ranks candidates based on CV content, work history, and skill alignment with the job description.</textarea>
+          </div>
+          <div style="margin-bottom:14px">
+            <label>Known Limitations</label>
+            <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;height:80px;resize:none">- Gender bias detected in university ranking proxy features
+- Model not validated for non-Western CV formats
+- Performance drops for candidates with career gaps</textarea>
+          </div>
+          <div><label>NIST AI RMF Category</label><select><option>GOVERN — Policies & Accountability</option><option selected>MAP — Risk Identification</option><option>MEASURE — Risk Analysis</option><option>MANAGE — Risk Response</option></select></div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Community Impact Assessment</div></div>
+          <table>
+            <thead><tr><th>Vulnerable Group</th><th>Impact Level</th><th>Mitigation Plan</th></tr></thead>
+            <tbody>
+              <tr><td class="ts">Women in STEM</td><td><span class="badge br">High</span></td><td style="color:var(--green)">Adversarial debiasing</td></tr>
+              <tr><td class="ts">Non-EU graduates</td><td><span class="badge bo">Medium</span></td><td style="color:var(--yellow)">Under review</td></tr>
+              <tr><td class="ts">People with disabilities</td><td><span class="badge bo">Medium</span></td><td style="color:var(--yellow)">Counterfactual aug.</td></tr>
+              <tr><td class="ts">Career returners</td><td><span class="badge by">Low-Med</span></td><td style="color:var(--blue)">Monitoring</td></tr>
+              <tr><td class="ts">Older workers (50+)</td><td><span class="badge by">Low-Med</span></td><td style="color:var(--blue)">Monitoring</td></tr>
+            </tbody>
+          </table>
+          <div class="div"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn">← Previous</button>
+            <button class="btn btn-p">Next: Limitations →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+function go(id, el, title, crumb) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.querySelectorAll('.s-item').forEach(s => s.classList.remove('on'));
+  document.getElementById('screen-'+id).classList.add('on');
+  if (el) el.classList.add('on');
+  document.getElementById('ttitle').textContent = title || id;
+  document.getElementById('tcrumb').textContent = crumb || ('AI Bias Laboratory › ' + title);
+}
+document.querySelectorAll('.ro').forEach(r => r.onclick = function() { this.classList.toggle('sel'); });
+</script>
+</body>
+</html>
