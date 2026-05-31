@@ -3,4 +3,7 @@ services:
     name: ai-bias-laboratory
     runtime: python
     buildCommand: pip install --upgrade pip && pip install --only-binary=scipy,numpy,scikit-learn,pandas -r requirements.txt
-    startCommand: streamlit run app/main.py --server.address=0.0.0.0 --server.port=$PORT
+    startCommand: PYTHONPATH=. streamlit run app/main.py --server.address=0.0.0.0 --server.port=$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
