@@ -1,8 +1,8 @@
 """Bias Generator Page — Synthetic Bias Injection UI."""
 import streamlit as st
 import pandas as pd
-from app.core.bias_generator import inject_bias
-from app.core.utils import load_sample_data
+from core.bias_generator import inject_bias
+from core.utils import load_sample_data
 
 st.set_page_config(page_title="Bias Generator", layout="wide")
 st.title("🧪 Synthetic Bias Generator")

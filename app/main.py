@@ -5,7 +5,7 @@ Dark theme matching internal risk tooling aesthetic.
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from app.core.utils import load_sample_data
+from core.utils import load_sample_data
 
 st.set_page_config(
     page_title="AI Bias Laboratory",

@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from app.core.benchmarks import run_all_benchmarks
+from core.benchmarks import run_all_benchmarks
 
 st.set_page_config(page_title="Benchmark Runner", layout="wide")
 st.title("📊 Benchmark Runner")
