@@ -6,6 +6,19 @@
 
 ---
 
+## 0. Positioning — why this exists (the deployer's burden)
+
+Bias Lab tests **AI systems as deployed**, not foundation models in isolation. The distinction that matters is not "own model vs. top-tier model" — it is **who carries the legal liability**, and that is almost never the model builder.
+
+- **The obligation sits with the deployer.** Under the EU AI Act, the Art. 10 bias-examination duty for a high-risk system falls on the organisation that *deploys* it. An insurer running GPT-4 or Claude behind CV-screening or claims triage cannot hide behind "OpenAI already tested the model". It must show that in *its* use-case, on *its* population, in *its* language, the system shows no prohibited bias. Model builders test general fairness; the deployer must prove **contextual** fairness. That gap is the market.
+- **Bias lives in the integration, not only the model.** What runs in production is model + system prompt + RAG context + fine-tuning + thresholds + use-case framing. Any of those layers can introduce or amplify bias, and the model builder never saw your prompt. Bias Lab tests the **composed system as it runs live** — which no one else can do for you.
+- **"We tested it" is not audit evidence.** Vendor fairness reports are not accepted by an auditor or supervisor as compliance evidence for *your* system. You need reproducible, independent, in-context evidence with config-hash and seed — exactly what the core loop produces. The vendor claim is not a substitute.
+- **Sharpest case: a top-tier model used as an assessment/decision engine.** Any tool that uses a foundation model to judge, classify or support decisions (e.g. Peter's own eu-ai-act-compliance-checker, or any RAG/agent system) inherits that model's bias *inside the judgement function itself* — a blind spot no one tests, because the builder never evaluated the model as "compliance classifier for the Dutch insurance sector". This is both a product use-case and Bias Lab's first dogfood pilot (§E).
+
+**Primary customer:** the organisation with an Art. 10 obligation deploying a model — bought or built — in a high-risk context. Since nearly every corporate deployer buys its LLM yet still carries the full burden of proof, this is a larger and more legally compelling market than "test your own model".
+
+---
+
 ## A. Functional requirements — core loop
 
 ### Describe
