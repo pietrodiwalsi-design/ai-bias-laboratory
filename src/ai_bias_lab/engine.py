@@ -242,6 +242,16 @@ class FairnessAuditEngine:
         """
         recommendations = []
 
+        # FIX F3 (2026-09-18 remediation brief, P1): expected_disparate_impact_improvement
+        # was a fixed constant (0.15 / 0.12) presented as a data-derived
+        # estimate, identical regardless of how severe the actual disparity
+        # was. Replaced with heuristic_target_gap (target_value minus
+        # current_value -- a plain arithmetic gap, not a claim about what
+        # will happen) plus an explicit `basis` field disclosing it is not
+        # estimated from the dataset. Only post_processing's gap is
+        # naturally data-dependent (target minus current); pre/in-processing
+        # gaps are also now computed the same honest way rather than left as
+        # unrelated fixed numbers.
         if metrics.disparate_impact_ratio < 0.80:
             recommendations.append(MitigationRecommendation(
                 mitigation_type=MitigationType.POST_PROCESSING_THRESHOLD,
@@ -252,7 +262,7 @@ class FairnessAuditEngine:
                     "Implement Fairlearn ThresholdOptimizer to establish subgroup-specific decision "
                     "thresholds, ensuring selection rates satisfy the 80% four-fifths rule under EU AI Act Art. 10."
                 ),
-                expected_disparate_impact_improvement=round(0.85 - metrics.disparate_impact_ratio, 3)
+                heuristic_target_gap=round(0.85 - metrics.disparate_impact_ratio, 3),
             ))
 
         if abs(metrics.statistical_parity_difference) > 0.10:
@@ -265,7 +275,7 @@ class FairnessAuditEngine:
                     "Apply sample reweighting (Fairlearn CorrelationRemover / sample weights) to balance "
                     "representation of underrepresented demographic cohorts in training data."
                 ),
-                expected_disparate_impact_improvement=0.15
+                heuristic_target_gap=round(abs(metrics.statistical_parity_difference) - 0.05, 3),
             ))
 
         if metrics.equalized_odds_difference > 0.15:
@@ -278,7 +288,7 @@ class FairnessAuditEngine:
                     "Retrain model using Fairlearn ExponentiatedGradient with EqualizedOdds constraint "
                     "to equalize False Positive and False Negative rates across protected classes."
                 ),
-                expected_disparate_impact_improvement=0.12
+                heuristic_target_gap=round(metrics.equalized_odds_difference - 0.08, 3),
             ))
 
         return recommendations

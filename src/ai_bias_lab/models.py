@@ -95,7 +95,17 @@ class MitigationRecommendation(BaseModel):
     current_value: float
     target_value: float
     recommended_action: str
-    expected_disparate_impact_improvement: float
+    # FIX F3 (2026-09-18 remediation brief, P1): expected_disparate_impact_improvement
+    # was removed. Evidence: across 3 audits with very different disparate
+    # impact (0.6501, 0.4731, 0.1000), pre_processing/in_processing
+    # 'expected' values were fixed constants (0.15 / 0.12) regardless of the
+    # actual data -- an unquantified recommendation is more honest than a
+    # fake quantity. Chose option (a) from the brief (remove entirely)
+    # rather than (b) rename-with-basis-field, since a heuristic constant
+    # dressed up with a 'basis' label still invites being read as a number
+    # that means something dataset-specific.
+    heuristic_target_gap: float = Field(description="target_value minus current_value; NOT a data-derived estimate, purely the numeric gap to the stated target")
+    basis: str = Field(default="fixed heuristic threshold gap, not estimated from this dataset", description="Explicit disclosure that this recommendation is templated, not modelled")
 
 
 class LLMPromptAuditInput(BaseModel):
