@@ -17,7 +17,8 @@ from ai_bias_lab.models import (
     FairnessMetrics, DatasetAuditInput, ModelFairnessInput,
     BiasAuditReport, LLMPromptAuditInput, ComplianceStatus
 )
-from ai_bias_lab.engine import FairnessAuditEngine
+from ai_bias_lab.engine import FairnessAuditEngine, compute_dataset_fingerprint, TOOL_VERSION
+from datetime import datetime, timezone
 from ai_bias_lab.pension_scenarios import generate_pension_underwriting_dataset
 from ai_bias_lab.llm_bias import LLMBiasAuditor
 from ai_bias_lab.dashboard_generator import BiasDashboardGenerator
@@ -112,7 +113,7 @@ TOOLS = [
     },
     {
         "name": "generate_bias_audit_report",
-        "description": "Generates a formal standalone HTML audit report and certificate for EU AI Act Article 10 compliance dossiers.",
+        "description": "Generates a formal standalone HTML audit report for a Life & Pensions fairness dossier, embedding the supplied audit_result (from audit_dataset_bias) so the report can never silently diverge from the audit actually reviewed by the caller.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -243,12 +244,30 @@ def handle_request(req):
                 if reference_group is not None and not isinstance(reference_group, str):
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'reference_group' must be a string"}}
 
+                # FIX F8: optional caller-specified random_seed, echoed back
+                # for bootstrap reproducibility. Defaults to the engine's
+                # own seed (42) when omitted, same as before.
+                random_seed_arg = args.get("random_seed")
+                if random_seed_arg is not None and not isinstance(random_seed_arg, int):
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'random_seed' must be an integer"}}
+
                 try:
-                    metrics = engine.calculate_fairness_metrics(y_true, y_pred, sens, reference_group=reference_group)
+                    metrics = engine.calculate_fairness_metrics(
+                        y_true, y_pred, sens,
+                        reference_group=reference_group,
+                        random_seed=random_seed_arg,
+                    )
                 except ValueError as ve:
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": str(ve)}}
                 proxy_corrs = engine.detect_proxy_correlations(df, sens_col)
                 mitigations = engine.suggest_mitigations(metrics)
+
+                # FIX F8: audit trail, so this output can be tied to a
+                # specific data version and reproduced.
+                metrics.audit_timestamp = datetime.now(timezone.utc).isoformat()
+                metrics.tool_version = TOOL_VERSION
+                metrics.dataset_fingerprint = compute_dataset_fingerprint(df)
+                metrics.random_seed_used = random_seed_arg if random_seed_arg is not None else engine.random_seed
 
                 report = {
                     "dataset_name": dataset_name,

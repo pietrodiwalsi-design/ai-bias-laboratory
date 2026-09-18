@@ -110,6 +110,13 @@ class FairnessMetrics(BaseModel):
     reference_group: Optional[str] = Field(default=None, description="Subgroup with the HIGHEST selection rate in this comparison (the implicit baseline)")
     comparison_group: Optional[str] = Field(default=None, description="Subgroup with the LOWEST selection rate in this comparison")
     reference_group_selection: Optional[str] = Field(default=None, description="Rule used to pick reference_group, e.g. 'highest selection rate' or 'caller-specified via reference_group parameter'")
+    # FIX F8 (2026-09-18 remediation brief, P2): audit trail. Without these,
+    # no output could be tied to a specific data version or reproduced
+    # after the fact.
+    audit_timestamp: Optional[str] = Field(default=None, description="ISO 8601 UTC timestamp of when this computation ran")
+    tool_version: Optional[str] = Field(default=None, description="ai-bias-laboratory server version string")
+    dataset_fingerprint: Optional[str] = Field(default=None, description="SHA-256 hash of the canonicalised input records (stable for the built-in dataset)")
+    random_seed_used: Optional[int] = Field(default=None, description="The random seed actually used for bootstrap CI resampling, echoed back for reproducibility")
 
     @model_validator(mode="after")
     def _sync_deprecated_art10_alias(self):

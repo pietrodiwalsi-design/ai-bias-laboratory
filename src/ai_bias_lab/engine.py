@@ -3,6 +3,9 @@ Core Fairness and Bias Audit Engine using Fairlearn and scikit-learn.
 """
 
 from typing import Dict, List, Any, Optional, Tuple
+import hashlib
+import json as _json
+from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from fairlearn.metrics import (
@@ -24,6 +27,20 @@ from ai_bias_lab.models import (
 # COMPLIANT/WARNING/NON_COMPLIANT.
 MIN_SUBGROUP_SAMPLE_SIZE = 30
 DEFAULT_BOOTSTRAP_ITERATIONS = 1000
+
+# FIX F8 (2026-09-18 remediation brief, P2): server version string, echoed
+# into every audit response's tool_version field.
+TOOL_VERSION = "1.1.0"
+
+
+def compute_dataset_fingerprint(df: pd.DataFrame) -> str:
+    """FIX F8: SHA-256 of the canonicalised (sorted columns, fixed row
+    order, JSON-serialised) input records, so a result can be tied back to
+    the exact data version it was computed against. Stable for the
+    built-in benchmark dataset (same seed -> same fingerprint)."""
+    canonical = df[sorted(df.columns)].to_dict(orient="records")
+    canonical_json = _json.dumps(canonical, sort_keys=True, default=str)
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 class FairnessAuditEngine:
