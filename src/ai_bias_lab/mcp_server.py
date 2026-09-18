@@ -15,7 +15,8 @@ import numpy as np
 
 from ai_bias_lab.models import (
     FairnessMetrics, DatasetAuditInput, ModelFairnessInput,
-    BiasAuditReport, LLMPromptAuditInput, ComplianceStatus
+    BiasAuditReport, LLMPromptAuditInput, ComplianceStatus,
+    ProxyCorrelationResult
 )
 from ai_bias_lab.engine import FairnessAuditEngine, compute_dataset_fingerprint, TOOL_VERSION
 from datetime import datetime, timezone
@@ -113,15 +114,29 @@ TOOLS = [
     },
     {
         "name": "generate_bias_audit_report",
-        "description": "Generates a formal standalone HTML audit report for a Life & Pensions fairness dossier, embedding the supplied audit_result (from audit_dataset_bias) so the report can never silently diverge from the audit actually reviewed by the caller.",
+        "description": (
+            "Renders a standalone HTML report from an audit_result you already obtained from "
+            "audit_dataset_bias -- it does NOT run a new audit or recompute anything. This is NOT a "
+            "certificate or attestation of any kind; it is a formatted rendering of findings you supply. "
+            "FIX F9 (2026-09-18 remediation brief): previously this tool ignored any prior audit and "
+            "silently recomputed its own fixed baseline (built-in dataset, hardcoded sensitive_column='gender'), "
+            "so a report could describe a completely different analysis than the one the caller actually "
+            "reviewed. audit_result is now a mandatory parameter -- the exact JSON object returned by "
+            "audit_dataset_bias -- and is rendered verbatim, including its dataset_fingerprint and "
+            "audit_timestamp, so the report is traceable to the specific audit run it documents."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "system_name": {"type": "string"},
                 "domain": {"type": "string", "default": "Life & Pensions Underwriting"},
-                "output_path": {"type": "string", "description": "Optional output path for HTML report"}
+                "audit_result": {
+                    "type": "object",
+                    "description": "The full JSON object previously returned by audit_dataset_bias for this system. Required -- this tool renders that result, it does not recompute it."
+                },
+                "output_path": {"type": "string", "description": "Required output path for the HTML report. There is no default location -- the tool refuses to write anywhere the caller did not explicitly specify."}
             },
-            "required": ["system_name"]
+            "required": ["system_name", "audit_result", "output_path"]
         }
     }
 ]
@@ -348,21 +363,49 @@ def handle_request(req):
                 }
 
             elif tool_name == "generate_bias_audit_report":
+                # FIX F9 (2026-09-18 remediation brief, P2): this tool used
+                # to accept NO audit findings as input -- signature was
+                # (system_name, domain, output_path) -- and silently
+                # recomputed its own fixed baseline internally (built-in
+                # dataset, hardcoded sensitive_column='gender'), regardless
+                # of what the caller had actually audited or reviewed. A
+                # report for a postcode_cluster audit would render gender
+                # figures instead, with no indication anything diverged.
+                # audit_result is now REQUIRED and rendered verbatim -- this
+                # tool no longer computes anything, it only formats an
+                # already-obtained audit_dataset_bias result. output_path is
+                # also now required: no default write location.
                 system_name = args.get("system_name")
                 domain = args.get("domain", "Life & Pensions Underwriting")
                 out_path = args.get("output_path")
+                audit_result = args.get("audit_result")
 
-                # Run baseline pension benchmark
-                df = generate_pension_underwriting_dataset(n_samples=500)
-                metrics = engine.calculate_fairness_metrics(df["y_true_eligibility"].values, df["y_pred_approval"].values, df["gender"].values)
-                proxy_corrs = engine.detect_proxy_correlations(df, "gender")
+                if not isinstance(system_name, str) or not system_name.strip():
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'system_name' is required and must be a non-empty string"}}
+                if not isinstance(out_path, str) or not out_path.strip():
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'output_path' is required. This tool refuses to pick a default write location."}}
+                if not isinstance(audit_result, dict):
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'audit_result' is required and must be the JSON object previously returned by audit_dataset_bias. This tool renders a prior audit, it does not compute a new one."}}
+
+                try:
+                    metrics_dict = dict(audit_result["metrics"])
+                    proxy_corrs_dict = dict(audit_result["proxy_correlations"])
+                except (KeyError, TypeError) as e:
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": f"Invalid params: 'audit_result' is missing expected field: {e}. It must be the unmodified object returned by audit_dataset_bias."}}
+
+                try:
+                    metrics = FairnessMetrics(**metrics_dict)
+                    proxy_corrs = ProxyCorrelationResult(**proxy_corrs_dict)
+                except Exception as e:
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": f"Invalid params: 'audit_result' failed validation: {e}"}}
+
                 mitigations = engine.suggest_mitigations(metrics)
 
                 audit_rep = BiasAuditReport(
                     audit_id=f"BIAS-AUD-{uuid.uuid4().hex[:6].upper()}",
                     system_name=system_name,
                     domain=domain,
-                    evaluated_at="2026-09-18",
+                    evaluated_at=metrics.audit_timestamp or "unknown",
                     metrics=metrics,
                     detected_proxy_correlations=proxy_corrs,
                     # FIX F5: renamed key from EU_AI_Act_Article_10 to
@@ -379,7 +422,8 @@ def handle_request(req):
                     },
                     mitigation_recommendations=mitigations,
                     executive_summary=(
-                        f"Algorithmic fairness assessment of {system_name} against the US EEOC four-fifths rule. "
+                        f"Algorithmic fairness assessment of {system_name} against the US EEOC four-fifths rule, "
+                        f"rendered from audit dataset_fingerprint={metrics.dataset_fingerprint}, audited at {metrics.audit_timestamp}. "
                         f"Disparate impact ratio is {metrics.disparate_impact_ratio} with statistical parity difference of {metrics.statistical_parity_difference}. "
                         f"EU AI Act Article 10 data-governance documentation status: not independently assessed by this tool (see art10_documentation_status)."
                     )
