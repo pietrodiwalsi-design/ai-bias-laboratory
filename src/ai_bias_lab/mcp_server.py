@@ -33,7 +33,17 @@ MAX_RECORDS_LIMIT = 50000
 TOOLS = [
     {
         "name": "audit_dataset_bias",
-        "description": "Scans tabular dataset records for Disparate Impact, Statistical Parity Difference, and proxy-variable correlations against sensitive demographic attributes.",
+        "description": (
+            "Scans tabular dataset records for Disparate Impact, Statistical Parity Difference, and "
+            "proxy-variable correlations against sensitive demographic attributes. Unknown target_column "
+            "or sensitive_column values return a tool error listing available columns (no silent fallback). "
+            "Verdicts report INSUFFICIENT_DATA when any compared subgroup has fewer than 30 records, and "
+            "include subgroup_counts + bootstrap 95% confidence intervals. NOTE on proxy_correlations: only "
+            "pairwise association between the sensitive attribute and each other single column is tested "
+            "(Pearson for numeric-vs-numeric, Cramer's V / correlation ratio for categorical); feature "
+            "INTERACTIONS that jointly reconstruct a protected attribute (e.g. two features that only "
+            "together correlate with the sensitive attribute) will NOT be detected by this tool."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -227,7 +237,7 @@ def handle_request(req):
                     "records_analyzed": len(df),
                     "sensitive_attribute": sens_col,
                     "metrics": metrics.model_dump(),
-                    "proxy_correlations": proxy_corrs,
+                    "proxy_correlations": proxy_corrs.model_dump(),
                     "mitigation_recommendations": [m.model_dump() for m in mitigations],
                     "eu_ai_act_art10_verdict": metrics.eu_ai_act_art10_status.value
                 }

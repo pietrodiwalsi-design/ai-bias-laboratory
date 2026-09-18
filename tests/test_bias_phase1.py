@@ -64,6 +64,15 @@ def test_pension_underwriting_scenario_generation():
 
 
 def test_proxy_correlation_detection(engine):
+    # NOTE (2026-09-18 remediation brief, F4): detect_proxy_correlations now
+    # returns a ProxyCorrelationResult, not a bare dict, so status/method
+    # can be distinguished from an empty result. This also demonstrates the
+    # core F4 fix: 'gender' is categorical and previously always returned {}
+    # (silently skipped), but now correctly computes and finds the injected
+    # proxy bias via Cramer's V / correlation ratio.
     df = generate_pension_underwriting_dataset(n_samples=500, inject_proxy_bias=True)
-    corrs = engine.detect_proxy_correlations(df, sensitive_column="gender", threshold=0.10)
-    assert isinstance(corrs, dict)
+    result = engine.detect_proxy_correlations(df, sensitive_column="gender", threshold=0.10)
+    assert result.status == "computed"
+    assert result.method == "cramers_v_and_correlation_ratio"
+    assert isinstance(result.correlations, dict)
+    assert len(result.correlations) > 0  # gender is no longer silently skipped

@@ -26,17 +26,28 @@ class BiasDashboardGenerator:
         art10_color = "#16A34A" if m.eu_ai_act_art10_status == ComplianceStatus.COMPLIANT else ("#D97706" if m.eu_ai_act_art10_status == ComplianceStatus.WARNING else "#DC2626")
 
         # Build proxy correlation rows
+        # FIX F4: report.detected_proxy_correlations is now a
+        # ProxyCorrelationResult, not a bare dict. Render its
+        # computed/not_computed status explicitly instead of letting an
+        # empty correlations dict look identical to 'nothing was checked'.
+        proxy_result = report.detected_proxy_correlations
         proxy_rows = []
-        for feat, corr in report.detected_proxy_correlations.items():
-            proxy_rows.append(f"""
-            <tr>
-                <td><strong>{html.escape(str(feat))}</strong></td>
-                <td><code>{corr}</code></td>
-                <td><span class="badge" style="background:#FEF3C7; color:#92400E;">High Proxy Risk (>0.35)</span></td>
-            </tr>
-            """)
-        if not proxy_rows:
-            proxy_rows.append("<tr><td colspan='3' style='text-align:center; color:#6B7280;'>Geen significante proxy-correlaties gedetecteerd (drempelwaarde < 0.35).</td></tr>")
+        if proxy_result.status == "not_computed":
+            proxy_rows.append(
+                f"<tr><td colspan='3' style='text-align:center; color:#92400E; background:#FEF3C7;'>"
+                f"Proxy-detectie niet uitgevoerd: {html.escape(str(proxy_result.reason or 'onbekende reden'))}</td></tr>"
+            )
+        else:
+            for feat, corr in proxy_result.correlations.items():
+                proxy_rows.append(f"""
+                <tr>
+                    <td><strong>{html.escape(str(feat))}</strong></td>
+                    <td><code>{corr}</code></td>
+                    <td><span class="badge" style="background:#FEF3C7; color:#92400E;">High Proxy Risk (>0.35)</span></td>
+                </tr>
+                """)
+            if not proxy_rows:
+                proxy_rows.append(f"<tr><td colspan='3' style='text-align:center; color:#6B7280;'>Geen significante proxy-correlaties gedetecteerd (drempelwaarde < 0.35; methode: {html.escape(str(proxy_result.method or 'n.v.t.'))}).</td></tr>")
 
         # Build mitigation rows
         mit_rows = []

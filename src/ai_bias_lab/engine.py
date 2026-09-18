@@ -10,10 +10,11 @@ from fairlearn.metrics import (
     equalized_odds_difference,
     MetricFrame
 )
+from scipy.stats import chi2_contingency as _chi2_contingency
 from ai_bias_lab.models import (
     FairnessMetrics, ComplianceStatus, MitigationRecommendation,
     MitigationType, FairnessMetricType, ProtectedAttribute,
-    SubgroupCount, ConfidenceInterval
+    SubgroupCount, ConfidenceInterval, ProxyCorrelationResult
 )
 
 # FIX F2 (2026-09-18 remediation brief, P0): minimum subgroup sample size
@@ -207,34 +208,108 @@ class FairnessAuditEngine:
         df: pd.DataFrame,
         sensitive_column: str,
         threshold: float = 0.35
-    ) -> Dict[str, float]:
+    ) -> ProxyCorrelationResult:
         """
         Detects proxy features in the dataset that correlate strongly with
         the sensitive attribute (e.g. postcode correlating with ethnicity or age).
+
+        FIX F4 (2026-09-18 remediation brief, P1): previously returned a bare
+        Dict[str, float] and used ONLY Pearson correlation on
+        category-code-encoded columns. This meant a genuinely categorical
+        sensitive attribute (gender, postcode_cluster) would frequently
+        produce an empty {} not because no proxy exists, but because
+        Pearson correlation on arbitrary category-code integers is not a
+        meaningful association measure for nominal categories -- "no proxy
+        found" and "not meaningfully computed" looked identical. This was
+        confirmed against the built-in dataset: proxy detection worked for
+        `age` (numeric, found pension_accrual_years at 0.98) but returned
+        {} for `gender` and `postcode_cluster` (categorical).
+
+        Now: numeric sensitive columns still use Pearson (unchanged
+        behaviour/values, see T6 regression guard). Categorical sensitive
+        columns use Cramér's V against other categorical columns and a
+        correlation-ratio (eta) style association for numeric columns,
+        instead of being silently skipped. The result always states
+        status='computed' with a method, or status='not_computed' with an
+        explicit reason -- never a bare, ambiguous {}.
         """
         if sensitive_column not in df.columns:
-            return {}
+            return ProxyCorrelationResult(status="not_computed", reason=f"sensitive_column '{sensitive_column}' not found in dataset")
 
-        correlations = {}
-        sens_series = pd.Series(df[sensitive_column])
-        if not np.issubdtype(sens_series.dtype, np.number):
-            sens_series = sens_series.astype("category").cat.codes
+        sens_col_data = df[sensitive_column]
+        sens_is_numeric = np.issubdtype(sens_col_data.dtype, np.number)
 
-        for col in df.columns:
-            if col == sensitive_column:
-                continue
-            col_series = df[col]
-            if not np.issubdtype(col_series.dtype, np.number):
-                col_series = col_series.astype("category").cat.codes
+        correlations: Dict[str, float] = {}
+        method_used = "pearson" if sens_is_numeric else "cramers_v_and_correlation_ratio"
 
-            try:
-                corr = abs(float(sens_series.corr(col_series)))
-                if np.isfinite(corr) and corr >= threshold:
-                    correlations[col] = round(corr, 3)
-            except Exception:
-                continue
+        if sens_is_numeric:
+            for col in df.columns:
+                if col == sensitive_column:
+                    continue
+                col_series = df[col]
+                col_numeric = col_series if np.issubdtype(col_series.dtype, np.number) else col_series.astype("category").cat.codes
+                try:
+                    corr = abs(float(pd.Series(sens_col_data).corr(pd.Series(col_numeric))))
+                    if np.isfinite(corr) and corr >= threshold:
+                        correlations[col] = round(corr, 3)
+                except Exception:
+                    continue
+        else:
+            # Categorical sensitive attribute: use Cramer's V against other
+            # categorical columns, and the correlation ratio (eta) against
+            # numeric columns -- both are bounded [0, 1] like Pearson |r|,
+            # so the same `threshold` remains comparable.
+            for col in df.columns:
+                if col == sensitive_column:
+                    continue
+                col_series = df[col]
+                try:
+                    if np.issubdtype(col_series.dtype, np.number):
+                        assoc = self._correlation_ratio(sens_col_data, col_series)
+                    else:
+                        assoc = self._cramers_v(sens_col_data, col_series)
+                    if np.isfinite(assoc) and assoc >= threshold:
+                        correlations[col] = round(float(assoc), 3)
+                except Exception:
+                    continue
 
-        return correlations
+        return ProxyCorrelationResult(status="computed", correlations=correlations, method=method_used)
+
+    @staticmethod
+    def _cramers_v(a: pd.Series, b: pd.Series) -> float:
+        """Cramer's V association measure between two categorical series
+        (0 = no association, 1 = perfect association), bias-corrected per
+        Bergsma (2013)."""
+        confusion = pd.crosstab(a, b)
+        chi2 = float(_chi2_contingency(confusion.values)[0])
+        n = confusion.values.sum()
+        if n == 0:
+            return 0.0
+        phi2 = chi2 / n
+        r, k = confusion.shape
+        phi2_corr = max(0.0, phi2 - ((k - 1) * (r - 1)) / max(n - 1, 1))
+        r_corr = r - ((r - 1) ** 2) / max(n - 1, 1)
+        k_corr = k - ((k - 1) ** 2) / max(n - 1, 1)
+        denom = min(k_corr - 1, r_corr - 1)
+        if denom <= 0:
+            return 0.0
+        return float(np.sqrt(phi2_corr / denom))
+
+    @staticmethod
+    def _correlation_ratio(categories: pd.Series, values: pd.Series) -> float:
+        """Correlation ratio (eta) between a categorical series and a numeric
+        series: proportion of the numeric variable's variance explained by
+        category membership (0 = none, 1 = fully explained)."""
+        values = pd.Series(values).astype(float)
+        categories = pd.Series(categories)
+        overall_mean = values.mean()
+        ss_total = float(((values - overall_mean) ** 2).sum())
+        if ss_total == 0:
+            return 0.0
+        ss_between = 0.0
+        for _, group in values.groupby(categories):
+            ss_between += len(group) * (group.mean() - overall_mean) ** 2
+        return float(np.sqrt(ss_between / ss_total))
 
     def suggest_mitigations(self, metrics: FairnessMetrics) -> List[MitigationRecommendation]:
         """

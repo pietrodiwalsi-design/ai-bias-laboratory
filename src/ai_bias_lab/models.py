@@ -133,13 +133,28 @@ class LLMBiasAuditReport(BaseModel):
     evaluations: List[PersonaEvaluation]
 
 
+class ProxyCorrelationResult(BaseModel):
+    """FIX F4 (2026-09-18 remediation brief, P1): replaces the bare
+    Dict[str, float] which conflated 'no proxy found' with 'proxy detection
+    was never run' -- both rendered as an empty {}. Categorical sensitive
+    attributes (gender, postcode_cluster) were silently skipped by the old
+    Pearson-only implementation and looked identical to a genuinely clean
+    numeric attribute with no correlated proxies."""
+    status: str = Field(description="'computed' or 'not_computed'")
+    reason: Optional[str] = Field(default=None, description="Why computation was skipped, when status='not_computed'")
+    correlations: Dict[str, float] = Field(default_factory=dict, description="feature -> association strength, only populated when status='computed'")
+    method: Optional[str] = Field(default=None, description="'pearson' (numeric) or 'cramers_v' / 'mutual_information' (categorical)")
+
+
 class BiasAuditReport(BaseModel):
     audit_id: str
     system_name: str
     domain: str
     evaluated_at: str
     metrics: FairnessMetrics
-    detected_proxy_correlations: Dict[str, float]
+    # FIX F4: carries the full computed/not_computed status + method, not
+    # just a bare (and ambiguous) correlations dict.
+    detected_proxy_correlations: ProxyCorrelationResult
     regulatory_verdicts: Dict[str, str] # e.g. {"EU_AI_Act_Art_10": "PASS", "WGBU_Equal_Treatment": "PASS"}
     mitigation_recommendations: List[MitigationRecommendation]
     executive_summary: str
