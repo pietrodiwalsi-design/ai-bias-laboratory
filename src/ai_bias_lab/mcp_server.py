@@ -60,14 +60,21 @@ TOOLS = [
             "properties": {
                 "dataset_name": {"type": "string", "description": "Name of dataset (e.g. 'Pension_Underwriting_2026')"},
                 "target_column": {"type": "string", "description": "Binary outcome column name (1: approved/favorable, 0: rejected)"},
-                "sensitive_column": {"type": "string", "description": "Sensitive attribute column (e.g. 'gender', 'postcode_cluster', 'age')"},
+                "sensitive_column": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}, "minItems": 2}
+                    ],
+                    "description": "FIX F11: Sensitive attribute column name (e.g. 'gender'), OR an array of 2+ column names (e.g. ['gender', 'postcode_cluster']) for INTERSECTIONAL analysis. When an array is given, metrics are computed over the cross-product of categories (e.g. 'gender=F & postcode_cluster=C_HighRiskUrban' as one combined subgroup) -- bias frequently appears only at intersections, not in any single attribute alone. The F2 minimum-n-of-30 guard applies per intersectional cell, which matters MORE here since cells are naturally smaller."
+                },
                 "records": {
                     "type": "array",
                     "description": "Array of row dictionaries. If omitted, uses built-in Life & Pensions underwriting benchmark dataset.",
                     "items": {"type": "object"}
                 },
                 "favorable_outcome": {"description": "Value representing favorable outcome", "default": 1},
-                "reference_group": {"type": "string", "description": "Optional: force this subgroup value as the reference/baseline for disparate_impact_ratio and statistical_parity_difference (both pairwise metrics). Defaults to the subgroup with the highest selection rate if omitted."}
+                "reference_group": {"type": "string", "description": "Optional: force this subgroup value as the reference/baseline for disparate_impact_ratio and statistical_parity_difference (both pairwise metrics). Defaults to the subgroup with the highest selection rate if omitted."},
+                "random_seed": {"type": "integer", "description": "Optional: seed for bootstrap CI resampling, echoed back as random_seed_used for reproducibility. Defaults to 42."}
             },
             "required": ["dataset_name", "target_column", "sensitive_column"]
         }
@@ -231,8 +238,13 @@ def handle_request(req):
                 # fallback path has been removed.
                 if not isinstance(target_col, str) or not target_col.strip():
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'target_column' is required and must be a non-empty string"}}
-                if not isinstance(sens_col, str) or not sens_col.strip():
-                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'sensitive_column' is required and must be a non-empty string"}}
+                # FIX F11: sensitive_column may be a string (single attribute)
+                # or a list of 2+ strings (intersectional analysis).
+                if isinstance(sens_col, list):
+                    if len(sens_col) < 2 or not all(isinstance(c, str) and c.strip() for c in sens_col):
+                        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'sensitive_column' as an array requires at least 2 non-empty column name strings"}}
+                elif not isinstance(sens_col, str) or not sens_col.strip():
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'sensitive_column' is required and must be a non-empty string, or an array of 2+ strings for intersectional analysis"}}
 
                 if records is not None and not isinstance(records, list):
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'records' must be an array"}}
@@ -244,14 +256,19 @@ def handle_request(req):
                 else:
                     df = generate_pension_underwriting_dataset(n_samples=500)
 
-                # Validate BOTH requested columns against the actual dataset
+                # FIX F11 (2026-09-18 remediation brief, P2): build the list
+                # of columns to validate/use, based on the type check above.
+                is_intersectional = isinstance(sens_col, list)
+                sens_cols_list = sens_col if is_intersectional else [sens_col]
+
+                # Validate ALL requested columns against the actual dataset
                 # columns before any computation happens. Report every
                 # unknown column by name (not just the first one found) plus
                 # the full list of columns that were actually available, so
                 # a typo is caught immediately instead of silently
                 # mislabelling a different attribute.
                 available_columns = list(df.columns)
-                unknown_cols = [c for c in (target_col, sens_col) if c not in available_columns]
+                unknown_cols = [c for c in ([target_col] + sens_cols_list) if c not in available_columns]
                 if unknown_cols:
                     if len(unknown_cols) == 1:
                         col_desc = f"Unknown column '{unknown_cols[0]}'"
@@ -260,8 +277,21 @@ def handle_request(req):
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": f"{col_desc}. Available columns: [{', '.join(available_columns)}]"}}
 
                 y_pred = df[target_col].values
-                sens = df[sens_col].values
                 y_true = df["y_true_eligibility"].values if "y_true_eligibility" in df.columns else y_pred
+
+                if is_intersectional:
+                    # Build a synthetic combined subgroup label per row, e.g.
+                    # "F|C_HighRiskUrban", so the existing pairwise engine
+                    # logic (min/max selection rate across groups) operates
+                    # over intersectional cells instead of single-attribute
+                    # categories. The F2 minimum-n-of-30 guard then applies
+                    # PER intersectional cell -- more important here since
+                    # cells are naturally smaller than single-attribute groups.
+                    sens = df[sens_cols_list].astype(str).agg("|".join, axis=1).values
+                    sens_col_label = "|".join(sens_cols_list) + " (intersectional)"
+                else:
+                    sens = df[sens_col].values
+                    sens_col_label = sens_col
 
                 # FIX F6: optional caller-specified reference_group.
                 reference_group = args.get("reference_group")
@@ -283,7 +313,15 @@ def handle_request(req):
                     )
                 except ValueError as ve:
                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": str(ve)}}
-                proxy_corrs = engine.detect_proxy_correlations(df, sens_col)
+                # FIX F11: proxy correlation detection is only meaningful
+                # against a single column; for intersectional analysis, run
+                # it against each individual attribute in the intersection
+                # rather than the synthetic combined label (which has no
+                # real-world meaning as a "column" to correlate against).
+                if is_intersectional:
+                    proxy_corrs_by_attr = {c: engine.detect_proxy_correlations(df, c).model_dump() for c in sens_cols_list}
+                else:
+                    proxy_corrs_by_attr = engine.detect_proxy_correlations(df, sens_col).model_dump()
                 mitigations = engine.suggest_mitigations(metrics)
 
                 # FIX F8: audit trail, so this output can be tied to a
@@ -296,9 +334,10 @@ def handle_request(req):
                 report = {
                     "dataset_name": dataset_name,
                     "records_analyzed": len(df),
-                    "sensitive_attribute": sens_col,
+                    "sensitive_attribute": sens_col_label,
+                    "intersectional": is_intersectional,
                     "metrics": metrics.model_dump(),
-                    "proxy_correlations": proxy_corrs.model_dump(),
+                    "proxy_correlations": proxy_corrs_by_attr,
                     "mitigation_recommendations": [m.model_dump() for m in mitigations],
                     "eu_ai_act_art10_verdict": metrics.eu_ai_act_art10_status.value
                 }
