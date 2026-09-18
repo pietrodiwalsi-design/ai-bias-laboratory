@@ -102,6 +102,14 @@ class FairnessMetrics(BaseModel):
     disparate_impact_ci_95: Optional[ConfidenceInterval] = Field(default=None, description="Bootstrap 95% CI for disparate_impact_ratio")
     statistical_parity_ci_95: Optional[ConfidenceInterval] = Field(default=None, description="Bootstrap 95% CI for statistical_parity_difference")
     warnings: List[str] = Field(default_factory=list, description="Plain-language caveats: small subgroup, wide CI, single-category attribute, etc.")
+    # FIX F6 (2026-09-18 remediation brief, P1): disparate_impact_ratio and
+    # statistical_parity_difference are PAIRWISE comparisons (min/max
+    # selection rate). When sensitive_column has >2 categories, the
+    # response never stated which two subgroups were actually compared or
+    # how they were picked -- silently defaulted to argmax/argmin.
+    reference_group: Optional[str] = Field(default=None, description="Subgroup with the HIGHEST selection rate in this comparison (the implicit baseline)")
+    comparison_group: Optional[str] = Field(default=None, description="Subgroup with the LOWEST selection rate in this comparison")
+    reference_group_selection: Optional[str] = Field(default=None, description="Rule used to pick reference_group, e.g. 'highest selection rate' or 'caller-specified via reference_group parameter'")
 
     @model_validator(mode="after")
     def _sync_deprecated_art10_alias(self):

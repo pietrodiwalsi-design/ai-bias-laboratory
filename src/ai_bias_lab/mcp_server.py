@@ -55,7 +55,8 @@ TOOLS = [
                     "description": "Array of row dictionaries. If omitted, uses built-in Life & Pensions underwriting benchmark dataset.",
                     "items": {"type": "object"}
                 },
-                "favorable_outcome": {"description": "Value representing favorable outcome", "default": 1}
+                "favorable_outcome": {"description": "Value representing favorable outcome", "default": 1},
+                "reference_group": {"type": "string", "description": "Optional: force this subgroup value as the reference/baseline for disparate_impact_ratio and statistical_parity_difference (both pairwise metrics). Defaults to the subgroup with the highest selection rate if omitted."}
             },
             "required": ["dataset_name", "target_column", "sensitive_column"]
         }
@@ -228,7 +229,15 @@ def handle_request(req):
                 sens = df[sens_col].values
                 y_true = df["y_true_eligibility"].values if "y_true_eligibility" in df.columns else y_pred
 
-                metrics = engine.calculate_fairness_metrics(y_true, y_pred, sens)
+                # FIX F6: optional caller-specified reference_group.
+                reference_group = args.get("reference_group")
+                if reference_group is not None and not isinstance(reference_group, str):
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": "Invalid params: 'reference_group' must be a string"}}
+
+                try:
+                    metrics = engine.calculate_fairness_metrics(y_true, y_pred, sens, reference_group=reference_group)
+                except ValueError as ve:
+                    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": str(ve)}}
                 proxy_corrs = engine.detect_proxy_correlations(df, sens_col)
                 mitigations = engine.suggest_mitigations(metrics)
 

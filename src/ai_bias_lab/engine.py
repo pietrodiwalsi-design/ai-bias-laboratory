@@ -44,7 +44,8 @@ class FairnessAuditEngine:
         sensitive_features: np.ndarray,
         favorable_label: int = 1,
         bootstrap_iterations: int = DEFAULT_BOOTSTRAP_ITERATIONS,
-        random_seed: Optional[int] = None
+        random_seed: Optional[int] = None,
+        reference_group: Optional[str] = None,
     ) -> FairnessMetrics:
         """
         Calculates Statistical/Demographic Parity Difference, Equalized Odds Difference,
@@ -56,6 +57,15 @@ class FairnessAuditEngine:
         COMPLIANT/WARNING/NON_COMPLIANT) whenever any compared subgroup has
         fewer than MIN_SUBGROUP_SAMPLE_SIZE (30) records. A COMPLIANT verdict
         on n=8 must never look the same as one on n=50,000.
+
+        FIX F6 (2026-09-18 remediation brief, P1): disparate_impact_ratio and
+        statistical_parity_difference are pairwise (min-selection-rate group
+        vs max-selection-rate group), which was never stated when
+        sensitive_features has more than 2 categories (e.g.
+        postcode_cluster). `reference_group` param lets the caller override
+        which subgroup is treated as the baseline; when omitted, the
+        subgroup with the highest selection rate is used (documented, not
+        silent).
         """
         y_true = np.asarray(y_true)
         y_pred = np.asarray(y_pred)
@@ -95,6 +105,32 @@ class FairnessAuditEngine:
                 n=n, n_favorable=n_fav,
                 selection_rate=round(float(selection_rates.loc[grp]), 4),
             )
+
+        # --- FIX F6: reference_group / comparison_group transparency ---
+        # disparate_impact_ratio and statistical_parity_difference are
+        # pairwise: min-selection-rate group vs max-selection-rate group.
+        # With >2 categories this was previously undocumented -- state
+        # which two subgroups were actually used, and how they were chosen.
+        ref_group_name: Optional[str] = None
+        cmp_group_name: Optional[str] = None
+        ref_selection_rule: Optional[str] = None
+        if len(selection_rates) >= 2:
+            if reference_group is not None:
+                if str(reference_group) not in subgroup_counts:
+                    raise ValueError(
+                        f"reference_group '{reference_group}' not found among subgroups: "
+                        f"{list(subgroup_counts.keys())}"
+                    )
+                ref_group_name = str(reference_group)
+                # comparison group: the subgroup with the lowest selection rate
+                # among the remaining subgroups (excluding the caller-chosen reference).
+                remaining = selection_rates.drop(labels=[reference_group]) if reference_group in selection_rates.index else selection_rates
+                cmp_group_name = str(remaining.idxmin()) if len(remaining) > 0 else ref_group_name
+                ref_selection_rule = "caller-specified via reference_group parameter"
+            else:
+                ref_group_name = str(selection_rates.idxmax())
+                cmp_group_name = str(selection_rates.idxmin())
+                ref_selection_rule = "highest selection rate"
 
         warnings: List[str] = []
         small_subgroups = [name for name, sc in subgroup_counts.items() if sc.n < MIN_SUBGROUP_SAMPLE_SIZE]
@@ -162,6 +198,9 @@ class FairnessAuditEngine:
             disparate_impact_ci_95=di_ci,
             statistical_parity_ci_95=spd_ci,
             warnings=warnings,
+            reference_group=ref_group_name,
+            comparison_group=cmp_group_name,
+            reference_group_selection=ref_selection_rule,
         )
 
     @staticmethod
