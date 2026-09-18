@@ -42,7 +42,16 @@ TOOLS = [
             "pairwise association between the sensitive attribute and each other single column is tested "
             "(Pearson for numeric-vs-numeric, Cramer's V / correlation ratio for categorical); feature "
             "INTERACTIONS that jointly reconstruct a protected attribute (e.g. two features that only "
-            "together correlate with the sensitive attribute) will NOT be detected by this tool."
+            "together correlate with the sensitive attribute) will NOT be detected by this tool. NOTE on "
+            "bias_amplification_factor: formula is abs(max_selection_rate - min_selection_rate) across "
+            "predicted outcomes, divided by the SAME quantity across GROUND-TRUTH labels (floor 0.01 on the "
+            "denominator to avoid division by zero). Range is theoretically unbounded (0 = model perfectly "
+            "equalizes an unequal ground truth; 1.0 = model reproduces ground-truth disparity unchanged; "
+            ">1.0 = model WIDENS a disparity that was smaller or absent in the ground truth; values near 0 "
+            "with LOW disparate_impact_ratio, as with 'age', suggest the disparity pre-exists in the "
+            "training data rather than being introduced by the model). This is a descriptive ratio, not a "
+            "pass/fail threshold under any named regulation or standard -- no compliance verdict is derived "
+            "from it."
         ),
         "inputSchema": {
             "type": "object",
