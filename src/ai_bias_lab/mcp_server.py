@@ -89,7 +89,16 @@ TOOLS = [
     },
     {
         "name": "suggest_fairness_mitigation",
-        "description": "Recommends actionable pre-processing (reweighting), in-processing, and post-processing (ThresholdOptimizer) mitigations to satisfy EU AI Act Art. 10 and the EEOC 80% rule.",
+        "description": (
+            "Recommends actionable pre-processing (reweighting), in-processing, and post-processing "
+            "(ThresholdOptimizer) mitigations to satisfy the EEOC 80% four-fifths rule. NOTE (F10): this is "
+            "deterministic templating on threshold comparisons against the three numbers you pass in, not an "
+            "independent analysis. audit_dataset_bias ALREADY embeds this exact same output as its "
+            "mitigation_recommendations field for every audit it runs -- call THIS tool separately only when "
+            "you already have metrics from elsewhere (a different tool, a manual calculation) and did not "
+            "run audit_dataset_bias. If you just ran audit_dataset_bias, do not call this tool again for the "
+            "same numbers; read mitigation_recommendations from that result instead."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
