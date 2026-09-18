@@ -52,18 +52,65 @@ class ConfidenceInterval(BaseModel):
     n_resamples: int
 
 
+class Art10DocumentationStatus(BaseModel):
+    """FIX F5 (2026-09-18 remediation brief, P1): Article 10 of Regulation
+    (EU) 2024/1689 covers data and data governance for high-risk AI
+    systems -- it does NOT specify a numeric fairness threshold. This is a
+    documentation-coverage CHECKLIST, not a computed ratio, and every item
+    defaults to 'not_assessed'. It must be supplied by the caller
+    (e.g. via a future input parameter or manual review) -- it is never
+    inferred from a fairness metric, because a metric cannot attest to
+    whether governance documentation exists.
+    """
+    data_governance_practices_documented: str = "not_assessed"
+    relevant_design_choices_recorded: str = "not_assessed"
+    data_provenance_and_collection_documented: str = "not_assessed"
+    examination_for_biases_performed: str = "not_assessed"
+    gaps_or_shortcomings_identified: str = "not_assessed"
+    mitigation_measures_in_place: str = "not_assessed"
+
+
 class FairnessMetrics(BaseModel):
     statistical_parity_difference: float = Field(description="Difference in selection rates between groups (ideal: 0.0)")
     equalized_odds_difference: float = Field(description="Difference in TPR/FPR between groups (ideal: 0.0)")
     disparate_impact_ratio: float = Field(description="Ratio of selection rates (EEOC 80% / four-fifths rule, ideal: >= 0.80)")
     bias_amplification_factor: float = Field(description="Ratio of output disparity to input data disparity (ideal: <= 1.0)")
     disparate_impact_status: ComplianceStatus = ComplianceStatus.COMPLIANT
-    eu_ai_act_art10_status: ComplianceStatus = ComplianceStatus.COMPLIANT
+    # FIX F5 (2026-09-18 remediation brief, P1): the four-fifths / 80% rule
+    # originates in the US EEOC Uniform Guidelines on Employee Selection
+    # Procedures (29 CFR 1607.4(D)) -- NOT EU AI Act Article 10, which
+    # covers data governance and does not define a numeric threshold.
+    # Renamed the computed field accordingly and added threshold_source.
+    # `eu_ai_act_art10_status` is KEPT as a deprecated alias for one release
+    # (see model_validator below) so nothing breaks; it mirrors
+    # eeoc_four_fifths_status and will be removed in a future release.
+    eeoc_four_fifths_status: ComplianceStatus = ComplianceStatus.COMPLIANT
+    threshold_source: str = Field(
+        default="US EEOC Uniform Guidelines, 29 CFR 1607.4(D) — four-fifths rule",
+        description="Regulatory/guidance source of the 80% threshold used for eeoc_four_fifths_status",
+    )
+    art10_documentation_status: Art10DocumentationStatus = Field(
+        default_factory=Art10DocumentationStatus,
+        description="EU AI Act Article 10 data-governance documentation checklist. Defaults to not_assessed for every item -- never inferred from a metric.",
+    )
+    eu_ai_act_art10_status: ComplianceStatus = Field(
+        default=ComplianceStatus.COMPLIANT,
+        description="DEPRECATED alias for eeoc_four_fifths_status, kept for one release for backward compatibility. This field name was always a mislabel: it reported the US EEOC four-fifths rule, not an EU AI Act Article 10 verdict. Use eeoc_four_fifths_status and art10_documentation_status instead.",
+    )
     # FIX F2 (additive fields, no existing field removed/renamed):
     subgroup_counts: Dict[str, SubgroupCount] = Field(default_factory=dict, description="Per-subgroup n, n_favorable, and selection_rate")
     disparate_impact_ci_95: Optional[ConfidenceInterval] = Field(default=None, description="Bootstrap 95% CI for disparate_impact_ratio")
     statistical_parity_ci_95: Optional[ConfidenceInterval] = Field(default=None, description="Bootstrap 95% CI for statistical_parity_difference")
     warnings: List[str] = Field(default_factory=list, description="Plain-language caveats: small subgroup, wide CI, single-category attribute, etc.")
+
+    @model_validator(mode="after")
+    def _sync_deprecated_art10_alias(self):
+        # Keep the deprecated eu_ai_act_art10_status field mirroring the
+        # correctly-named eeoc_four_fifths_status, so existing callers who
+        # read the old field name during the deprecation window still see
+        # the right verdict.
+        self.eu_ai_act_art10_status = self.eeoc_four_fifths_status
+        return self
 
 
 class DatasetAuditInput(BaseModel):

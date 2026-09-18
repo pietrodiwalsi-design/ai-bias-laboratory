@@ -130,20 +130,23 @@ class FairnessAuditEngine:
                     f"[{di_ci.lower}, {di_ci.upper}]: point estimate is not precise."
                 )
 
-        # Status classification based on the 80% / four-fifths rule and EU AI Act Art 10.
-        # INSUFFICIENT_DATA takes precedence over every other verdict (FIX F2).
+        # Status classification based on the 80% / four-fifths rule.
+        # FIX F5 (2026-09-18 remediation brief, P1): this threshold is the
+        # US EEOC four-fifths rule (29 CFR 1607.4(D)), NOT an EU AI Act
+        # Article 10 verdict -- renamed the variable and output field
+        # accordingly. INSUFFICIENT_DATA still takes precedence (FIX F2).
         if insufficient_data:
             di_status = ComplianceStatus.INSUFFICIENT_DATA
-            art10_status = ComplianceStatus.INSUFFICIENT_DATA
+            eeoc_status = ComplianceStatus.INSUFFICIENT_DATA
         elif di_ratio >= 0.80 and abs(spd) <= 0.10:
             di_status = ComplianceStatus.COMPLIANT
-            art10_status = ComplianceStatus.COMPLIANT
+            eeoc_status = ComplianceStatus.COMPLIANT
         elif di_ratio >= 0.65 or abs(spd) <= 0.20:
             di_status = ComplianceStatus.WARNING
-            art10_status = ComplianceStatus.WARNING
+            eeoc_status = ComplianceStatus.WARNING
         else:
             di_status = ComplianceStatus.NON_COMPLIANT
-            art10_status = ComplianceStatus.NON_COMPLIANT
+            eeoc_status = ComplianceStatus.NON_COMPLIANT
 
         return FairnessMetrics(
             statistical_parity_difference=round(spd, 4),
@@ -151,7 +154,10 @@ class FairnessAuditEngine:
             disparate_impact_ratio=round(di_ratio, 4),
             bias_amplification_factor=amp_factor,
             disparate_impact_status=di_status,
-            eu_ai_act_art10_status=art10_status,
+            eeoc_four_fifths_status=eeoc_status,
+            # eu_ai_act_art10_status is auto-synced to eeoc_four_fifths_status
+            # by the model_validator on FairnessMetrics (deprecated alias).
+            # art10_documentation_status is left at its not_assessed default.
             subgroup_counts=subgroup_counts,
             disparate_impact_ci_95=di_ci,
             statistical_parity_ci_95=spd_ci,

@@ -23,7 +23,9 @@ class BiasDashboardGenerator:
 
         m = report.metrics
         di_color = "#16A34A" if m.disparate_impact_status == ComplianceStatus.COMPLIANT else ("#D97706" if m.disparate_impact_status == ComplianceStatus.WARNING else "#DC2626")
-        art10_color = "#16A34A" if m.eu_ai_act_art10_status == ComplianceStatus.COMPLIANT else ("#D97706" if m.eu_ai_act_art10_status == ComplianceStatus.WARNING else "#DC2626")
+        # FIX F5: renamed from eu_ai_act_art10_status (mislabelled -- this is
+        # the US EEOC four-fifths threshold, not an EU AI Act Article 10 verdict).
+        eeoc_color = "#16A34A" if m.eeoc_four_fifths_status == ComplianceStatus.COMPLIANT else ("#D97706" if m.eeoc_four_fifths_status == ComplianceStatus.WARNING else "#DC2626")
 
         # Build proxy correlation rows
         # FIX F4: report.detected_proxy_correlations is now a
@@ -127,8 +129,8 @@ class BiasDashboardGenerator:
                 <div style="font-size:12px; margin-top:4px;">Status: <span class="badge" style="background:{di_color}; color:#fff;">{m.disparate_impact_status.value}</span></div>
             </div>
             <div class="card">
-                <div class="card-title">EU AI Act Art. 10 Compliance</div>
-                <div class="card-value" style="color:{art10_color};">{m.eu_ai_act_art10_status.value}</div>
+                <div class="card-title">EEOC Four-Fifths Rule ({html.escape(m.threshold_source)})</div>
+                <div class="card-value" style="color:{eeoc_color};">{m.eeoc_four_fifths_status.value}</div>
                 <div style="font-size:12px; margin-top:4px;">Data Governance & Non-discrimination</div>
             </div>
             <div class="card">

@@ -284,7 +284,10 @@ def handle_request(req):
                     disparate_impact_ratio=di,
                     bias_amplification_factor=1.0,
                     disparate_impact_status=ComplianceStatus.COMPLIANT if di >= 0.80 else ComplianceStatus.NON_COMPLIANT,
-                    eu_ai_act_art10_status=ComplianceStatus.COMPLIANT if di >= 0.80 and abs(spd) <= 0.10 else ComplianceStatus.NON_COMPLIANT
+                    # FIX F5: renamed from eu_ai_act_art10_status (mislabelled;
+                    # this is the US EEOC four-fifths threshold, not an EU AI
+                    # Act Article 10 verdict). Deprecated alias auto-synced.
+                    eeoc_four_fifths_status=ComplianceStatus.COMPLIANT if di >= 0.80 and abs(spd) <= 0.10 else ComplianceStatus.NON_COMPLIANT
                 )
                 recs = engine.suggest_mitigations(dummy_metrics)
                 return {
@@ -325,15 +328,23 @@ def handle_request(req):
                     evaluated_at="2026-09-18",
                     metrics=metrics,
                     detected_proxy_correlations=proxy_corrs,
+                    # FIX F5: renamed key from EU_AI_Act_Article_10 to
+                    # EEOC_Four_Fifths_Rule -- this verdict is the US EEOC
+                    # four-fifths threshold, not an EU AI Act Article 10
+                    # verdict. Art. 10's actual documentation checklist is
+                    # carried separately on metrics.art10_documentation_status
+                    # (not a regulatory_verdicts PASS/FAIL, since it is a
+                    # checklist of not_assessed/assessed items, not a ratio).
                     regulatory_verdicts={
-                        "EU_AI_Act_Article_10": metrics.eu_ai_act_art10_status.value,
+                        "EEOC_Four_Fifths_Rule": metrics.eeoc_four_fifths_status.value,
                         "WGBU_Equal_Treatment": "PASS" if metrics.disparate_impact_ratio >= 0.80 else "FAIL",
                         "EEOC_80_Percent_Rule": "PASS" if metrics.disparate_impact_ratio >= 0.80 else "FAIL"
                     },
                     mitigation_recommendations=mitigations,
                     executive_summary=(
-                        f"Algorithmic fairness assessment of {system_name} under EU AI Act Article 10. "
-                        f"Disparate impact ratio is {metrics.disparate_impact_ratio} with statistical parity difference of {metrics.statistical_parity_difference}."
+                        f"Algorithmic fairness assessment of {system_name} against the US EEOC four-fifths rule. "
+                        f"Disparate impact ratio is {metrics.disparate_impact_ratio} with statistical parity difference of {metrics.statistical_parity_difference}. "
+                        f"EU AI Act Article 10 data-governance documentation status: not independently assessed by this tool (see art10_documentation_status)."
                     )
                 )
 
@@ -342,7 +353,7 @@ def handle_request(req):
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "content": [{"type": "text", "text": f"Bias report successfully generated for {system_name}. Verdict: {metrics.eu_ai_act_art10_status.value}."}],
+                        "content": [{"type": "text", "text": f"Bias report successfully generated for {system_name}. EEOC four-fifths verdict: {metrics.eeoc_four_fifths_status.value}."}],
                         "html_preview": html_out[:400] + "...",
                         "isError": False
                     }
