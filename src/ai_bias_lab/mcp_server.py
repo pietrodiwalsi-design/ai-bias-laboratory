@@ -129,6 +129,22 @@ TOOLS = [
         }
     },
     {
+        "name": "describe_dataset",
+        "description": (
+            "FIX F12 (2026-09-18 remediation brief, P2): schema-discovery tool. The absence of this tool was "
+            "the root cause of F1 in practice -- callers had to guess column names. Returns column names, "
+            "dtypes, cardinality, and sample values for the built-in Life & Pensions underwriting benchmark "
+            "dataset, so a caller never has to guess a target_column or sensitive_column value for "
+            "audit_dataset_bias again."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dataset_name": {"type": "string", "description": "Optional; currently only the built-in benchmark dataset is available regardless of value supplied."}
+            }
+        }
+    },
+    {
         "name": "generate_bias_audit_report",
         "description": (
             "Renders a standalone HTML report from an audit_result you already obtained from "
@@ -408,6 +424,43 @@ def handle_request(req):
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {"content": [{"type": "text", "text": json.dumps(report.model_dump(), indent=2)}], "isError": False}
+                }
+
+            elif tool_name == "describe_dataset":
+                # FIX F12 (2026-09-18 remediation brief, P2): schema-discovery
+                # tool. Root cause of F1 in practice was callers having to
+                # guess column names. Only the built-in benchmark dataset is
+                # currently supported.
+                df = generate_pension_underwriting_dataset(n_samples=500)
+                columns_info = []
+                # Heuristic candidate flags: purely descriptive, not
+                # validated/legal thresholds -- flagged for a human/agent to
+                # confirm, never auto-applied.
+                likely_sensitive_names = {"gender", "age", "postcode_cluster", "ethnicity", "family_status", "health_status"}
+                likely_target_names = {"y_pred_approval", "y_true_eligibility"}
+                for col in df.columns:
+                    series = df[col]
+                    dtype_str = str(series.dtype)
+                    n_unique = int(series.nunique())
+                    sample_values = [str(v) for v in series.dropna().unique()[:5].tolist()]
+                    columns_info.append({
+                        "name": col,
+                        "dtype": dtype_str,
+                        "n_unique": n_unique,
+                        "sample_values": sample_values,
+                        "is_candidate_sensitive": col in likely_sensitive_names,
+                        "is_candidate_target": col in likely_target_names,
+                    })
+                result = {
+                    "dataset_name": "Pension_Underwriting_2026 (built-in benchmark)",
+                    "columns": columns_info,
+                    "n_records": len(df),
+                    "dataset_fingerprint": compute_dataset_fingerprint(df),
+                }
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}], "isError": False}
                 }
 
             elif tool_name == "generate_bias_audit_report":
