@@ -7,6 +7,13 @@ from core.benchmarks import run_all_benchmarks
 st.set_page_config(page_title="Benchmark Runner", layout="wide")
 st.title("📊 Benchmark Runner")
 st.caption("Lightweight implementations of standard AI bias benchmarks")
+st.warning(
+    "⚠️ **These are simulated scores, not real BBQ / CrowS-Pairs / WinoBias "
+    "evaluations.** No model or dataset is actually being tested. Each score "
+    "is a fixed formula driven purely by the 'Simulated Bias Level' slider "
+    "below — for demo/training purposes only. (2026-09-19 remediation: "
+    "previously shown without this disclosure.)"
+)
 
 benchmarks = st.multiselect("Select Benchmarks", ["BBQ", "CrowS-Pairs", "WinoBias"], default=["BBQ", "CrowS-Pairs", "WinoBias"])
 bias_level = st.slider("Simulated Bias Level", 0.0, 0.6, 0.25, 0.05)
@@ -17,7 +24,8 @@ if st.button("▶️ Run Benchmarks", type="primary"):
 
 if "benchmark_results" in st.session_state:
     res_df = pd.DataFrame(st.session_state["benchmark_results"])
-    st.dataframe(res_df, use_container_width=True, hide_index=True)
+    display_df = res_df.drop(columns=["methodology"], errors="ignore")
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     # Bar chart
     fig = px.bar(res_df, x="benchmark", y="score", color="pass_fail",

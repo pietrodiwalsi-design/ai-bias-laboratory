@@ -32,16 +32,19 @@ st.markdown("""
 st.title("🔬 AI Bias Laboratory")
 st.caption("Internal Risk & Fairness Auditing Platform — Phase 1")
 
-# KPI Cards
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("Models Audited", "47", "+3 this week")
-with col2:
-    st.metric("Avg Bias Score", "0.31", "-0.04")
-with col3:
-    st.metric("High-Risk Findings", "12", "3 new")
-with col4:
-    st.metric("Mitigations Applied", "29", "+7")
+# 2026-09-19 webapp-parity remediation: these four KPI cards previously
+# showed hardcoded fake numbers ("47 models audited", "+3 this week", etc.)
+# with zero connection to any real audit activity -- a viewer had no way to
+# tell this from a live production metric. Mirrors the same
+# fabricated-evidence pattern already fixed (F3/F9) in the MCP server on
+# 2026-09-18. Replaced with an explicit demo-mode banner instead of inventing
+# a "real-looking" number with no backing data.
+st.info(
+    "🧪 **Demo mode** — this dashboard shell is not yet wired to a real audit "
+    "log. Use the sidebar (Bias Generator / Benchmark Runner) to run a live "
+    "computation on the sample dataset; every result there is clearly labeled "
+    "with its sample size, whether it's simulated, and any statistical caveats."
+)
 
 st.divider()
 
@@ -56,16 +59,6 @@ fig = px.bar(
 )
 fig.update_layout(paper_bgcolor="#0d1117", plot_bgcolor="#161b22", font_color="#c9d1d9")
 st.plotly_chart(fig, use_container_width=True)
-
-# Recent Audits
-st.subheader("Recent Audits")
-recent = pd.DataFrame({
-    "Model": ["Hiring-v3", "Claims-Scoring", "Fraud-Detect", "Underwriting-2"],
-    "Protected Attr": ["gender", "age", "race", "gender"],
-    "Bias Score": [0.28, 0.41, 0.19, 0.33],
-    "Status": ["Mitigated", "In Review", "Pass", "Mitigated"]
-})
-st.dataframe(recent, use_container_width=True, hide_index=True)
 
 st.divider()
 st.caption("Quick Actions → Use sidebar to navigate to Bias Generator, Benchmarks, or Fairness Metrics")
