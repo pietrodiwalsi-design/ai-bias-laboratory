@@ -5,7 +5,7 @@ Generates controlled bias in datasets for testing fairness metrics.
 from typing import Dict, Tuple, Literal
 import pandas as pd
 import numpy as np
-from .utils import set_seed
+from .utils import set_seed, MIN_SUBGROUP_SAMPLE_SIZE
 
 InjectionMethod = Literal["label_flip", "feature_skew", "sampling_bias"]
 
@@ -44,17 +44,51 @@ def inject_bias(
     if "hired" not in df.columns:
         raise ValueError("Dataset must contain 'hired' outcome column")
 
-    # Calculate before bias
+    # 2026-09-19 webapp-parity remediation: unknown/unsupported protected
+    # attributes previously fell through every branch silently and returned
+    # the ORIGINAL, unmodified dataframe with an empty-looking metadata dict
+    # -- indistinguishable from "no bias found" rather than "not supported".
+    # Mirrors the F1 fix (hard-fail on unknown columns) already applied to
+    # the MCP server on 2026-09-18.
+    if protected_attribute not in ("gender", "age"):
+        raise ValueError(
+            f"Unsupported protected_attribute '{protected_attribute}'. "
+            f"This demo dataset/engine only supports bias injection for: gender, age. "
+            f"(race/disability are selectable in the UI as attributes but have no "
+            f"injection logic implemented yet -- selecting them must fail loudly, "
+            f"not silently return unchanged data.)"
+        )
+
+    # Calculate before bias, and flag when a subgroup is too small for the
+    # before/after hire-rate comparison to be statistically meaningful
+    # (F2-equivalent guard).
+    metadata["warnings"] = []
     if protected_attribute == "gender":
         male_mask = df["gender"] == "male"
         before_male_rate = df.loc[male_mask, "hired"].mean()
         before_female_rate = df.loc[~male_mask, "hired"].mean()
         metadata["before_stats"] = {"male_hire_rate": round(before_male_rate, 3), "female_hire_rate": round(before_female_rate, 3)}
+        counts = {"male": int(male_mask.sum()), "female": int((~male_mask).sum())}
+        metadata["subgroup_counts"] = counts
+        if min(counts.values()) < MIN_SUBGROUP_SAMPLE_SIZE:
+            metadata["warnings"].append(
+                f"Insufficient data: subgroup counts {counts} below minimum "
+                f"sample size ({MIN_SUBGROUP_SAMPLE_SIZE}) -- before/after "
+                f"hire-rate comparison is not statistically reliable."
+            )
     elif protected_attribute == "age":
         young_mask = df["age"] < 50
         before_young = df.loc[young_mask, "hired"].mean()
         before_old = df.loc[~young_mask, "hired"].mean()
         metadata["before_stats"] = {"under50_hire_rate": round(before_young, 3), "over50_hire_rate": round(before_old, 3)}
+        counts = {"under50": int(young_mask.sum()), "over50": int((~young_mask).sum())}
+        metadata["subgroup_counts"] = counts
+        if min(counts.values()) < MIN_SUBGROUP_SAMPLE_SIZE:
+            metadata["warnings"].append(
+                f"Insufficient data: subgroup counts {counts} below minimum "
+                f"sample size ({MIN_SUBGROUP_SAMPLE_SIZE}) -- before/after "
+                f"hire-rate comparison is not statistically reliable."
+            )
 
     # Apply injection
     if injection_method == "label_flip":

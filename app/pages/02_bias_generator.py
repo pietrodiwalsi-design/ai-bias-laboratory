@@ -21,18 +21,36 @@ with col1:
     if st.button("🚀 Run Injection Test", type="primary"):
         df = load_sample_data()
         results = {}
+        errors = []
         for attr in protected_attrs:
-            biased_df, meta = inject_bias(df, attr, bias_intensity, injection_method, seed)
-            results[attr] = {"df": biased_df, "meta": meta}
+            try:
+                biased_df, meta = inject_bias(df, attr, bias_intensity, injection_method, seed)
+                results[attr] = {"df": biased_df, "meta": meta}
+            except ValueError as e:
+                # 2026-09-19 webapp-parity remediation: an unsupported attribute
+                # (e.g. race/disability, selectable in the UI but with no
+                # injection logic behind them) must surface as a visible error,
+                # never as a silently unchanged "no bias found" result.
+                errors.append(str(e))
         st.session_state["bias_results"] = results
-        st.success("Bias injection complete")
+        st.session_state["bias_errors"] = errors
+        if results:
+            st.success(f"Bias injection complete for: {', '.join(results.keys())}")
+        if errors:
+            for err in errors:
+                st.error(err)
 
 with col2:
-    if "bias_results" in st.session_state:
+    if "bias_results" in st.session_state and st.session_state["bias_results"]:
         for attr, res in st.session_state["bias_results"].items():
             st.subheader(f"Results: {attr}")
             meta = res["meta"]
+            if meta.get("warnings"):
+                for w in meta["warnings"]:
+                    st.warning(w)
             st.json(meta)
             st.dataframe(res["df"].head(8), use_container_width=True)
+    elif st.session_state.get("bias_errors"):
+        st.info("No attributes were successfully processed — see errors on the left.")
     else:
         st.info("Run an injection test to see before/after statistics and biased dataset preview")
