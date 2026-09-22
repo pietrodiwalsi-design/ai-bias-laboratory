@@ -135,6 +135,42 @@ The AI Bias Laboratory is a comprehensive platform for testing, measuring, and m
 
 ---
 
+## Phase 5: Production Hardening & Real-World Compliance Readiness (NEXT PHASE — Proposed, Not Started)
+
+> **Status: On hold / future project.** Not committed, not scheduled. Documented on 2026-09-19 as a ready-to-execute reference in case a concrete business use case justifies moving this from internal demo tool to a real IT Risk instrument. Triggered by an internal review that found the app (Streamlit UI on Render) had drifted out of sync with hardening already applied to the MCP server (F1-F12 fail-open fixes, 2026-09-18), plus a broader look at what's genuinely missing before any real (non-synthetic) data could touch this tool.
+
+**Goal:** Close the gap between "credible demo" and "tool the business can actually rely on for a real audit," without over-building before real demand exists.
+
+**Reality check vs. original Phase 2-4 scope:** The propagation visualizer, 4-way mitigation comparison UI, PDF/JSON reporting, and multi-tenant SaaS layer described in Phases 2-4 above were never fully built in the Streamlit app — `screenshot_mitigation.png` / `screenshot_propagation.png` are UX mockups, not shipped features. The MCP server (`src/ai_bias_lab/`) implements `suggest_fairness_mitigation` and `generate_bias_audit_report` as headless tools, but the public web app only ships Phase 1 (bias generator, benchmark runner, fairness metrics). Phase 5 below assumes we pick up from that real baseline, not the originally-planned-but-unbuilt Phase 2-4 feature set.
+
+### 5.1 Security & Access (1-2 weeks)
+- SSO/login (Google Workspace account gate) — no more unauthenticated public URL
+- Role-based access (who can run audits vs. read-only)
+- TLS + secrets management, private hosting instead of open Render URL
+
+### 5.2 Data Governance (2-4 weeks)
+- DPIA / privacy review before any non-synthetic data path is opened
+- Data retention policy (what's kept, where, for how long)
+- Safe upload/anonymization flow; synthetic/anonymized data remains the default unless explicitly cleared
+
+### 5.3 Real Compliance Mapping (4-8 weeks — the long pole)
+- Build an actual EU AI Act Article 10 assessment (the current `eu_ai_act_art10_status` field is, and is now explicitly labelled as, the US EEOC four-fifths rule — not Article 10)
+- Replace or explicitly retire the simulated BBQ/CrowS-Pairs/WinoBias benchmark runner (currently a bias-level-driven formula, not a real evaluation) with genuine implementations, or keep it clearly marked as illustrative-only
+- Formal Legal / Compliance / DPO sign-off before any "compliance instrument" claim is made internally or externally
+
+### 5.4 Audit Trail & Operations (2-3 weeks)
+- Immutable audit log of every analysis run (who, when, what dataset fingerprint, what result)
+- Versioned findings/reports instead of ephemeral session state
+- Basic monitoring + a support model, then a pilot on one real, bounded use case
+
+**Effort estimate (order of magnitude, not a quote):** ~10-17 weeks total, part-time alongside existing IT Risk workload, no dedicated team, external legal review as needed. 5.1 and 5.2 can run in parallel; 5.3 is the critical path.
+
+**Decision gate before starting:** Is there a concrete audit use case that justifies the investment, or does this stay a training/demo asset? This phase should not be started speculatively.
+
+**Related artifact:** Google Doc "AI Bias Laboratory — Roadmap naar Productie-Waardige Tool" (2026-09-19) has the same plan in narrative form with a diagram, for sharing with non-technical stakeholders.
+
+---
+
 ## Repository Structure
 
 ```
