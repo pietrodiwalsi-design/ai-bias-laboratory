@@ -45,11 +45,27 @@ class SubgroupCount(BaseModel):
 
 
 class ConfidenceInterval(BaseModel):
-    """FIX F2: bootstrap 95% confidence interval for a point estimate."""
+    """FIX F2: bootstrap 95% confidence interval for a point estimate.
+
+    FIX N2 (round 2 verification, 2026-09-22): for a SIGNED statistic
+    (e.g. signed statistical parity difference = reference_group's
+    selection rate minus comparison_group's selection rate), `lower` may
+    be negative -- the interval is on the signed statistic, not on its
+    absolute value, so direction is preserved and the interval can
+    straddle zero. `excludes_zero` is a convenience flag: True means the
+    interval does not contain 0, i.e. the disparity's direction is not
+    plausibly attributable to sampling noise at the 95% level (a
+    disparity-in-either-direction cannot be ruled out when this is False).
+    Unsigned statistics (e.g. disparate_impact_ratio, which is a ratio
+    bounded in [0, 1] with no direction to lose) leave `excludes_zero` as
+    None -- "excludes zero" is not a meaningful question for a ratio whose
+    ideal value is 1.0, not 0.
+    """
     lower: float
     upper: float
     method: str = "bootstrap_percentile"
     n_resamples: int
+    excludes_zero: Optional[bool] = Field(default=None, description="For signed statistics only: True if the 95% CI does not contain 0 (disparity direction is unlikely to be sampling noise). None for unsigned/ratio statistics where this question does not apply.")
 
 
 class Art10DocumentationStatus(BaseModel):
@@ -72,9 +88,31 @@ class Art10DocumentationStatus(BaseModel):
 
 class FairnessMetrics(BaseModel):
     statistical_parity_difference: float = Field(description="Difference in selection rates between groups (ideal: 0.0)")
-    equalized_odds_difference: float = Field(description="Difference in TPR/FPR between groups (ideal: 0.0)")
+    # FIX N7 (round 2 verification, 2026-09-22): equalized_odds_difference
+    # is nullable. Fairlearn's equalized_odds_difference() silently treats
+    # an undefined per-subgroup TPR or FPR (0/0, e.g. a subgroup with no
+    # positive -- or no negative -- ground-truth cases) as 0, which makes
+    # the reported difference look artificially maximal (observed: 1.0 on
+    # a 2-row probe where one subgroup had zero positive labels). None
+    # here means "not computable for this input", never "no disparity" --
+    # the accompanying `warnings` entry names the affected subgroup(s) and
+    # which rate (TPR/FPR) was undefined.
+    equalized_odds_difference: Optional[float] = Field(default=None, description="Difference in TPR/FPR between groups (ideal: 0.0). null when a subgroup has an undefined TPR or FPR (no positive, or no negative, ground-truth cases) -- see warnings.")
     disparate_impact_ratio: float = Field(description="Ratio of selection rates (EEOC 80% / four-fifths rule, ideal: >= 0.80)")
-    bias_amplification_factor: float = Field(description="Ratio of output disparity to input data disparity (ideal: <= 1.0)")
+    # FIX N4 (round 2 verification, 2026-09-22): bias_amplification_factor
+    # is nullable and documented. Formula: abs(max_selection_rate -
+    # min_selection_rate) across PREDICTED outcomes, divided by the SAME
+    # quantity across GROUND-TRUTH labels. When the ground-truth disparity
+    # is at or near zero (input_disparity < BIAS_AMPLIFICATION_MIN_INPUT_DISPARITY,
+    # currently 0.01) the ratio is mathematically explosive/undefined --
+    # e.g. output disparity 1.0 over input disparity 0.01 previously
+    # produced a sentinel-like 100.0 that was indistinguishable from a
+    # genuine measurement and differed by 100x from an n=2 case (1.0) with
+    # identical headline SPD/EOD/DI values. Now null + a warning in that
+    # regime; otherwise the ratio is reported as before (0 = model
+    # perfectly equalizes an unequal ground truth; 1.0 = model reproduces
+    # ground-truth disparity unchanged; >1.0 = model WIDENS a disparity).
+    bias_amplification_factor: Optional[float] = Field(default=None, description="Ratio of output (predicted) selection-rate disparity to input (ground-truth) selection-rate disparity. null when the ground-truth disparity is too close to zero for the ratio to be meaningful -- see warnings. Descriptive only, not a compliance threshold.")
     disparate_impact_status: ComplianceStatus = ComplianceStatus.COMPLIANT
     # FIX F5 (2026-09-18 remediation brief, P1): the four-fifths / 80% rule
     # originates in the US EEOC Uniform Guidelines on Employee Selection
@@ -107,9 +145,33 @@ class FairnessMetrics(BaseModel):
     # selection rate). When sensitive_column has >2 categories, the
     # response never stated which two subgroups were actually compared or
     # how they were picked -- silently defaulted to argmax/argmin.
-    reference_group: Optional[str] = Field(default=None, description="Subgroup with the HIGHEST selection rate in this comparison (the implicit baseline)")
-    comparison_group: Optional[str] = Field(default=None, description="Subgroup with the LOWEST selection rate in this comparison")
-    reference_group_selection: Optional[str] = Field(default=None, description="Rule used to pick reference_group, e.g. 'highest selection rate' or 'caller-specified via reference_group parameter'")
+    # FIX N1 (round 2 verification, 2026-09-22): on a tie in selection rate
+    # (including the degenerate case of a single subgroup), the naive
+    # idxmax/idxmin pick would pick the SAME subgroup as both reference and
+    # comparison, silently comparing a group to itself (DI = 1.0, SPD = 0.0
+    # by construction, whether or not that is the true answer). The
+    # documented deterministic tiebreak is: (1) if the top-rate group is not
+    # unique, prefer the tied group with the largest n, then lexically
+    # smallest label; (2) comparison_group is chosen from the REMAINING
+    # subgroups only (reference_group excluded), with the same n/lexical
+    # tiebreak on its own ties. If there is genuinely only one subgroup,
+    # reference_group_selection states so explicitly and comparison_group
+    # is null -- DI/SPD are undefined with one group, not silently 1.0/0.0.
+    reference_group: Optional[str] = Field(default=None, description="Subgroup with the HIGHEST selection rate in this comparison (the implicit baseline). Ties broken by largest n, then lexical order -- see reference_group_selection.")
+    comparison_group: Optional[str] = Field(default=None, description="Subgroup with the LOWEST selection rate among the remaining subgroups (reference_group excluded), so it is never equal to reference_group when 2+ subgroups exist.")
+    reference_group_selection: Optional[str] = Field(default=None, description="Rule used to pick reference_group, e.g. 'highest selection rate', 'highest selection rate (tie broken by largest n)', 'caller-specified via reference_group parameter', or 'undefined: only one subgroup present'")
+    # FIX N2 (round 2 verification, 2026-09-22): signed statistical parity,
+    # alongside the existing (unsigned, magnitude-only)
+    # statistical_parity_difference. signed_statistical_parity_difference =
+    # reference_group's selection rate minus comparison_group's selection
+    # rate, so its SIGN carries direction (positive: reference_group is
+    # favoured over comparison_group at the point estimate -- this is
+    # always >= 0 by construction of how reference/comparison are chosen,
+    # but statistical_parity_ci_95 is bootstrapped on this SIGNED quantity,
+    # so the interval legitimately straddles zero when resamples
+    # occasionally favour the other group). Use this signed value, not
+    # abs(), to read which group's CI bound is which direction.
+    signed_statistical_parity_difference: Optional[float] = Field(default=None, description="reference_group's selection rate minus comparison_group's selection rate (signed). The magnitude equals statistical_parity_difference; the sign gives direction. statistical_parity_ci_95 is bootstrapped on this signed statistic.")
     # FIX F8 (2026-09-18 remediation brief, P2): audit trail. Without these,
     # no output could be tied to a specific data version or reproduced
     # after the fact.
@@ -193,6 +255,13 @@ class LLMBiasAuditReport(BaseModel):
     detected_proxy_biases: List[str]
     compliance_verdict: ComplianceStatus
     evaluations: List[PersonaEvaluation]
+    # FIX O1 (round 1/2 verification, 2026-09-22, most serious finding):
+    # states the documented scope of the deterministic system_prompt text
+    # scan that now drives per-persona risk_score adjustments -- what kinds
+    # of explicit directives it detects, and that a clean scan is not proof
+    # of an unbiased prompt, only that no directive of the checked kinds
+    # was found. See ai_bias_lab.llm_bias._scan_prompt_directives.
+    prompt_scan_notes: List[str] = Field(default_factory=list, description="Documented scope/limitations of the system_prompt directive scan that fed into these personas' risk scores.")
 
 
 class ProxyCorrelationResult(BaseModel):
