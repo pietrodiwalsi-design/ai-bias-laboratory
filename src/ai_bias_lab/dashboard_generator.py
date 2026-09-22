@@ -22,6 +22,12 @@ class BiasDashboardGenerator:
         safe_summary = html.escape(str(report.executive_summary))
 
         m = report.metrics
+        # FIX N7 / FIX N4 (round 2 verification, 2026-09-22): both fields can
+        # now be None when not computable (undefined equalized-odds rate,
+        # or a ground-truth disparity too close to zero for
+        # bias_amplification_factor -- see warnings). Render that
+        # explicitly rather than the bare Python string "None".
+        eod_display = m.equalized_odds_difference if m.equalized_odds_difference is not None else "Not computable (see warnings)"
         di_color = "#16A34A" if m.disparate_impact_status == ComplianceStatus.COMPLIANT else ("#D97706" if m.disparate_impact_status == ComplianceStatus.WARNING else "#DC2626")
         # FIX F5: renamed from eu_ai_act_art10_status (mislabelled -- this is
         # the US EEOC four-fifths threshold, not an EU AI Act Article 10 verdict).
@@ -140,7 +146,7 @@ class BiasDashboardGenerator:
             </div>
             <div class="card">
                 <div class="card-title">Equalized Odds Difference</div>
-                <div class="card-value">{m.equalized_odds_difference}</div>
+                <div class="card-value">{eod_display}</div>
                 <div style="font-size:12px; color:#6B7280; margin-top:4px;">Error rate parity (TPR/FPR)</div>
             </div>
         </div>
